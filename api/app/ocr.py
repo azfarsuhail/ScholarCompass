@@ -7,9 +7,12 @@ Two constraints shape this file:
    DPI, greyscaled, and released before the next one. Rendering the whole
    document up front is what OOMs the container.
 
-2. Privacy. The uploaded bytes are never written to disk. They arrive in
-   memory, get converted to text, and are dropped when this function returns.
-   Only the extracted text and the parsed grade are persisted.
+2. Privacy. Only the extracted text and parsed grade are persisted -- the
+   upload itself is dropped when the request ends. Note the caveat: Starlette
+   spools a multipart upload above ~1MB to a temp file, so bytes can briefly
+   touch disk during parsing before the OS removes the file. That window is
+   bounded by MaxBodySizeMiddleware (app/limits.py), which rejects anything
+   over MAX_BYTES before parsing begins.
 """
 
 from __future__ import annotations

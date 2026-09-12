@@ -15,6 +15,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     CheckConstraint,
+    Computed,
     Date,
     DateTime,
     ForeignKey,
@@ -26,7 +27,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -261,4 +262,45 @@ class VisaEvidence(Base):
             "('visa_free','visa_required','e_visa','visa_on_arrival','eta','no_admission')",
             name="ck_visa_requirement",
         ),
+    )
+
+
+class VisaSourceChunk(Base):
+    """Retrieval corpus for the visa RAG: chunks of official immigration pages.
+
+    Retrieval is Postgres full-text search, not vectors. Groq has no embeddings
+    endpoint and a local embedding model would not fit the 512MB container, but
+    the deciding factor is that this corpus is small, highly structured and
+    full of exact terms a student's question repeats verbatim ("X1 visa",
+    "JW202", "residence permit"). Lexical search is genuinely strong on that
+    shape of text -- vectors would be added weight for worse exact-term recall.
+
+    ponytail: FTS + LLM rerank. Revisit only if recall measurably falls short.
+    """
+
+    __tablename__ = "visa_source_chunks"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    destination_iso3: Mapped[str] = mapped_column(String(3), index=True)
+    # NULL means the page applies to all nationalities.
+    passport_iso3: Mapped[str | None] = mapped_column(String(3), index=True)
+
+    url: Mapped[str] = mapped_column(Text)
+    publisher: Mapped[str | None] = mapped_column(Text)
+    title: Mapped[str | None] = mapped_column(Text)
+    content: Mapped[str] = mapped_column(Text)
+
+    # Generated in Postgres so the index can never drift from the content.
+    search_vector = mapped_column(
+        TSVECTOR,
+        Computed("to_tsvector('english', coalesce(title,'') || ' ' || content)", persisted=True),
+    )
+
+    retrieved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_visa_chunk_fts", "search_vector", postgresql_using="gin"),
+        Index("ix_visa_chunk_pair", "destination_iso3", "passport_iso3"),
     )

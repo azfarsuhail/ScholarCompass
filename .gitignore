@@ -19,3 +19,6 @@ next-env.d.ts
 coverage/
 .pytest_cache/
 uploads/
+
+.playwright-mcp/
+*.png

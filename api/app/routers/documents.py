@@ -24,9 +24,10 @@ async def upload_document(
 ) -> dict:
     """OCR a transcript and fold the result into the session profile.
 
-    The upload itself is never persisted. It is read into memory, converted to
-    text, and dropped when this handler returns -- so the worst case for a
-    breach is the extracted grade, not a scan of someone's passport.
+    The upload is not persisted: it is converted to text and dropped when this
+    handler returns. The size ceiling is enforced by MaxBodySizeMiddleware
+    *before* the body is parsed -- see app/limits.py for why a check in here
+    would be too late to prevent either an OOM or a spill to disk.
     """
     content_type = (file.content_type or "").split(";")[0].strip()
     if content_type not in ALLOWED_TYPES:
@@ -35,6 +36,9 @@ async def upload_document(
                  "Upload a PDF or an image of your transcript.")
 
     data = await file.read()
+    # Belt-and-braces: the middleware already rejected anything larger, but a
+    # handler that trusts an upstream guard it cannot see is a handler that
+    # breaks quietly when someone reorders the middleware stack.
     if len(data) > MAX_BYTES:
         raise HTTPException(413, f"File is larger than {MAX_BYTES // (1024 * 1024)}MB.")
 

@@ -11,8 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .config import settings
 from .db import Base, SessionLocal, engine, get_db
+from .limits import MaxBodySizeMiddleware
 from .models import AnonSession
-from .routers import documents
+from .ocr import MAX_BYTES
+from .routers import documents, match, visa
 from .session import COOKIE_NAME, SessionCookieMiddleware, current_session
 
 SWEEP_INTERVAL_SECONDS = 900
@@ -62,9 +64,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Order matters: CORS is added last so it runs OUTERMOST, ensuring the
-# Access-Control-* headers are present even on error responses.
+# Order matters. Middleware added LAST runs OUTERMOST, so the body-size guard
+# must be added after the session middleware: it has to reject an oversized
+# upload before anything downstream parses or spools it.
 app.add_middleware(SessionCookieMiddleware)
+app.add_middleware(MaxBodySizeMiddleware, max_bytes=MAX_BYTES)
 
 app.add_middleware(
     CORSMiddleware,
@@ -76,6 +80,8 @@ app.add_middleware(
 
 
 app.include_router(documents.router)
+app.include_router(match.router)
+app.include_router(visa.router)
 
 
 @app.get("/health")

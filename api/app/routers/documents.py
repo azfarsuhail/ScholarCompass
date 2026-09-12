@@ -17,6 +17,19 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/documents", tags=["documents"])
 
 ALLOWED_TYPES = {"application/pdf", "image/png", "image/jpeg", "image/webp", "image/tiff"}
+PDF_MAGIC = b"%PDF-"
+
+
+def _resolved_content_type(content_type: str, data: bytes, filename: str | None) -> str:
+    """Normalize common mobile upload MIME quirks before type gating."""
+    if content_type in ALLOWED_TYPES:
+        return content_type
+    if content_type == "application/octet-stream":
+        if data.startswith(PDF_MAGIC):
+            return "application/pdf"
+        if filename and filename.lower().endswith(".pdf"):
+            return "application/pdf"
+    return content_type
 
 
 @router.post("", status_code=201)
@@ -35,12 +48,12 @@ async def upload_document(
     would be too late to prevent either an OOM or a spill to disk.
     """
     content_type = (file.content_type or "").split(";")[0].strip()
+    data = await file.read()
+    content_type = _resolved_content_type(content_type, data, file.filename)
     if content_type not in ALLOWED_TYPES:
         raise HTTPException(
             415, f"Unsupported file type '{content_type or 'unknown'}'. "
                  "Upload a PDF or an image of your transcript.")
-
-    data = await file.read()
     # Belt-and-braces: the middleware already rejected anything larger, but a
     # handler that trusts an upstream guard it cannot see is a handler that
     # breaks quietly when someone reorders the middleware stack.

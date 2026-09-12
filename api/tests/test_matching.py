@@ -12,7 +12,7 @@ from datetime import date
 import pytest
 
 from app import grading, ocr
-from app.ingest import crawler
+from app.ingest import catalogue, crawler
 from app.matching.filters import relax
 
 TODAY = date(2026, 9, 12)
@@ -163,3 +163,41 @@ def test_empty_spa_shell_escalates_to_browser():
 def test_server_rendered_page_does_not_waste_a_browser():
     html = '<div id="__next">' + ("Eligibility criteria for applicants. " * 40) + "</div>"
     assert not crawler.needs_js(html)
+
+
+# --- field inference -------------------------------------------------------
+# An empty fields_of_study reads as "matches everything", which is how a
+# multilingualism master became an exact match for an engineer.
+
+def test_fields_are_inferred_from_a_title():
+    assert "engineering" in catalogue.infer_fields("Master in Biomedical Engineering")
+
+
+def test_unrelated_subject_is_not_tagged_engineering():
+    fields = catalogue.infer_fields("Joint Master in Multilingualism and Cultural Diversity")
+    assert "engineering" not in fields
+    assert "arts and humanities" in fields
+
+
+@pytest.mark.parametrize(
+    "title",
+    ["Copernicus Master in Digital Earth", "Artificial Intelligence in Chemistry"],
+    ids=["earth-contains-art", "artificial-contains-art"],
+)
+def test_short_keywords_match_whole_words_only(title):
+    """Substring matching tagged both of these as arts and humanities."""
+    assert "arts and humanities" not in catalogue.infer_fields(title)
+
+
+def test_ai_title_is_computer_science():
+    assert "computer science" in catalogue.infer_fields("Artificial Intelligence in Chemistry")
+
+
+def test_unknown_subject_stays_untagged():
+    """Untagged means unfiltered, which is safer than a wrong tag."""
+    assert catalogue.infer_fields("Programme XYZ") == []
+
+
+def test_tagging_never_runs_away():
+    many = catalogue.infer_fields("engineering computer medicine law physics economics art")
+    assert len(many) <= 4

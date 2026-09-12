@@ -12,6 +12,10 @@ export type Scholarship = {
   deadline: string | null;
   is_rolling: boolean;
   source_url: string;
+  /** Set when the publisher states a deadline policy rather than a date
+   *  (DAAD: "deadlines are updated annually"). Distinguishes "announced
+   *  later" from "we could not find one". */
+  deadline_note?: string | null;
 };
 
 export type MatchEvent = {

@@ -48,6 +48,71 @@ DAAD_BASE = "https://www2.daad.de/deutschland/stipendium/datenbank/en/21148-scho
 DAAD_STATUS = {"bachelor": "1", "master": "3", "phd": "4"}
 
 
+# Keyword -> field tag. Deterministic on purpose: this feeds the R0/R5 field
+# filter, and an LLM guess in that path would put a model back inside the
+# eligibility decision, which is exactly what the architecture keeps it out of.
+_FIELD_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "engineering": ("engineering", "mechanical", "electrical", "civil", "robotic",
+                    "aerospace", "manufactur", "mechatron", "materials"),
+    "computer science": ("computer", "computing", "informatic", "software", "cyber",
+                         "artificial intelligence", "ai", "machine learning",
+                         "data", "algorithm"),
+    "medicine": ("medicine", "medical", "health", "clinical", "pharma", "nursing",
+                 "epidemiolog", "biomed"),
+    "economics": ("econom", "finance", "business", "management", "trade", "banking"),
+    "public policy": ("policy", "governance", "public administration", "political",
+                      "international relations", "development studies", "diplomacy"),
+    "agriculture": ("agricultur", "food", "crop", "soil", "forestry", "rural",
+                    "veterinar", "fisheries"),
+    "environment": ("environment", "climate", "sustainab", "ecolog", "energy",
+                    "water", "marine", "biodivers"),
+    "law": ("law", "legal", "justice", "human rights"),
+    "physics": ("physics", "photonic", "quantum", "nuclear", "astro"),
+    "chemistry": ("chemistry", "chemical", "molecul"),
+    "biology": ("biolog", "genetic", "microbio", "neuro", "ecolo"),
+    "arts and humanities": ("art", "music", "literature", "philosoph", "histor",
+                            "cultur", "heritage", "language", "linguist", "media",
+                            "film", "design", "architect", "translation"),
+    "education": ("education", "teaching", "pedagog", "learning science"),
+    "social sciences": ("sociolog", "anthropolog", "psycholog", "social work",
+                        "gender", "migration", "urban"),
+    "mathematics": ("mathemat", "statistic", "actuarial"),
+}
+
+
+def _matches(blob: str, keyword: str) -> bool:
+    """Word-aware keyword match.
+
+    Naive substring matching tagged "Copernicus Master in Digital Earth" as arts
+    and humanities, because "art" is inside "E-art-h" -- and "Artificial
+    Intelligence in Chemistry" for the same reason. Short keywords therefore
+    have to match a WHOLE word; longer entries in the table are deliberate
+    stems ("engineer", "agricultur") and may match as a word prefix.
+    """
+    if len(keyword) <= 4:
+        return re.search(rf"\b{re.escape(keyword)}s?\b", blob) is not None
+    return re.search(rf"\b{re.escape(keyword)}", blob) is not None
+
+
+def infer_fields(*texts: str) -> list[str]:
+    """Tag a programme with fields of study from its title and description.
+
+    The catalogues do not publish a machine-readable subject taxonomy, and
+    leaving this empty is not neutral: an empty list means "no field stated",
+    which the matcher treats as "matches everything". That is how a
+    multilingualism master ends up an exact match for an engineer.
+
+    Keyword matching is crude but it is auditable and it only ever *narrows*
+    a result set that would otherwise be wrong.
+    """
+    blob = " ".join(t or "" for t in texts).lower()
+    found = [field for field, keys in _FIELD_KEYWORDS.items()
+             if any(_matches(blob, k) for k in keys)]
+    # Runaway tagging is as useless as none at all: a programme tagged with ten
+    # fields matches every student.
+    return found[:4]
+
+
 def _slug(prefix: str, key: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", f"{prefix}-{key}".lower()).strip("-")[:200]
 
@@ -222,7 +287,7 @@ async def crawl_erasmus(c: Crawler, max_pages: int = 11) -> int:
                 "provider": "Erasmus Mundus (European Commission)",
                 "host_country_iso3": None,  # joint programmes span several countries
                 "degree_levels": ["master"],
-                "fields_of_study": [],
+                "fields_of_study": infer_fields(card["title"], card["description"]),
                 "min_gpa_4": None,
                 "min_language_score": {},
                 "eligible_nationalities": [],
@@ -319,7 +384,7 @@ async def crawl_daad(c: Crawler, origin: str = "194", status: str = "3", limit: 
             "provider": "DAAD",
             "host_country_iso3": "DEU",
             "degree_levels": [level],
-            "fields_of_study": [],
+            "fields_of_study": infer_fields(data["title"], text[:2000]),
             "min_gpa_4": None,
             "min_language_score": {},
             # The listing was filtered by origin, so every row here is one this
@@ -401,6 +466,25 @@ def _demo() -> None:
         "Application Procedure Application deadline Application deadlines are "
         "updated annually in the second quarter. In most cases they match 2025."
     ) is None
+    # Field inference: the fix for "multilingualism master is an exact match
+    # for an engineer", which happened because an empty field list reads as
+    # "matches everything".
+    assert "engineering" in infer_fields("Erasmus Mundus Master in Biomedical Engineering")
+    assert "arts and humanities" in infer_fields(
+        "Erasmus Mundus Joint Master in Multilingualism and Cultural Diversity")
+    assert "engineering" not in infer_fields(
+        "Erasmus Mundus Joint Master in Multilingualism and Cultural Diversity")
+    assert "computer science" in infer_fields("QUAntum Research Master in Data Science")
+    # "Earth" must not match "art", and neither must "Artificial".
+    assert "arts and humanities" not in infer_fields("Copernicus Master in Digital Earth")
+    assert "arts and humanities" not in infer_fields("Artificial Intelligence in Chemistry")
+    assert "computer science" in infer_fields("Artificial Intelligence in Chemistry")
+    # Unknown subjects stay empty rather than being force-fitted into a field.
+    assert infer_fields("Programme XYZ") == []
+    assert infer_fields("") == []
+    # Never tag so broadly that everything matches.
+    assert len(infer_fields("engineering computer medicine law physics economics art")) <= 4
+
     print("catalogue deadline-parsing self-check passed")
 
 

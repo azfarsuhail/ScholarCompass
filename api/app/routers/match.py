@@ -58,6 +58,9 @@ def _row_to_dict(s: Scholarship) -> dict:
         "deadline": s.deadline, "is_rolling": s.is_rolling,
         "source_url": s.source_url,
         "last_verified_at": s.last_verified_at,
+        # Lets the UI distinguish "the publisher announces this later" from
+        # "we could not find a deadline". See ingest/catalogue.py.
+        "deadline_note": (s.raw or {}).get("deadline_note"),
     }
 
 

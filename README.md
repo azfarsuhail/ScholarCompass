@@ -32,7 +32,7 @@ cd web && API_ORIGIN=http://127.0.0.1:8000 npm run dev
 ```
 
 ```bash
-cd api && .venv/Scripts/python -m pytest        # 34 tests
+cd api && .venv/Scripts/python -m pytest        # 58 tests
 .venv/Scripts/python -m pytest -m live          # hits real Orizn; needs a key
 ```
 
@@ -88,7 +88,7 @@ whitelists, and degree level. Closed deadlines appear only at R4 and are always
 labelled closed.
 
 The ladder runs in memory over one coarse SQL query rather than six round-trips
-to Neon — measured 250–271ms against a 5s budget. It is a pure function over
+to Neon — measured 1.7s against Neon in ap-southeast-1, well inside the 5s budget. It is a pure function over
 plain dicts, so it is tested without a database.
 
 ## Privacy
@@ -101,15 +101,60 @@ kept. A background sweeper hard-deletes expired sessions, and `DELETE
 Verified: forged cookies are rejected and re-issued, and after deletion the old
 cookie resolves to a brand-new empty session.
 
+## The funnel
+
+```
+/          landing
+/start     details (transcript upload or manual)
+/results   progressive matches -> direct handoff to the official application page
+```
+
+Each result card links straight to the programme's own site — the Erasmus
+catalogue's title link *is* the application URL. No intermediate detail page,
+no affiliate hop. It opens in a new tab so a student does not lose their
+results on every outbound click.
+
+## Data
+
+237 programmes crawled live from the Erasmus Mundus catalogue and the DAAD
+database (driven through its real dropdowns: `origin=194` Pakistan,
+`status=3` Graduates, read from the live `<select>`).
+
+Crawling is strictly serial with one reused browser page and images/fonts/media
+blocked at the network layer, so peak memory does not track catalogue size.
+Playwright lives only in `Dockerfile.ingest`.
+
+`visa_source_chunks` is seeded from Orizn rather than scraped from government
+portals. Catalogue text never enters the visa corpus — otherwise "what visa do
+I need?" could retrieve a scholarship deadline.
+
+## Validation
+
+`passport=PAK&destination=CHN` returns `visa_required`, plus a RAG explanation
+whose citations all resolve to real Orizn URLs. Verified end to end against
+live Neon, Orizn and Groq:
+
+```
+deterministic:  1705ms  (budget: 5s)
+candidates:     92 at R0 -> 40 returned
+enrichment:     26/40 scored by Groq, streamed in behind the results
+```
+
 ## Known gaps
 
-- **Orizn's free plan is licensed for evaluation / non-commercial use only**
-  (it says so in the response body). A paid plan is required before launch.
-- The visa RAG corpus (`visa_source_chunks`) has no crawler feeding it yet —
-  the pipeline, retrieval and citation discipline are built and tested, but
-  it returns `None` until official pages are ingested.
-- `Base.metadata.create_all` on startup. Fine while the schema moves and there
-  is no production data; switch to Alembic before the first migration under
-  live rows.
-- Vercel deploy is unconfigured (`API_ORIGIN` needs to point at the deployed
-  backend). The CLI was not installed in this environment.
+- **Orizn free plan is capped at 5 requests until you confirm your email.**
+  Clicking the confirmation link unlocks 100/month, free, no card. We spent the
+  5 seeding 4 pairs (PAK→CHN/DEU/GBR/TUR). After confirming, re-run
+  `python -m app.ingest.visa_sources` to seed more; `--repair-evidence`
+  rebuilds the structured cache from the existing corpus at no quota cost.
+  The free plan is also licensed for non-commercial evaluation only.
+- **45 of 251 programmes have no inferred field of study**, so they are not
+  field-filtered and appear for everyone. Untagged is deliberately safer than
+  mis-tagged, but a real taxonomy would beat keyword matching.
+- **DAAD publishes no fixed deadlines** ("updated annually in the second
+  quarter"), so those rows carry a note instead of a date. Not a parser bug —
+  the date genuinely is not on the page.
+- `Base.metadata.create_all` on startup. Fine while the schema moves; switch to
+  Alembic before the first migration under live rows.
+- Vercel deploy is configured but not run — set `API_ORIGIN` to the deployed
+  backend and `vercel deploy` (CLI not installed in this environment).

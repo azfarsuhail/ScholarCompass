@@ -74,7 +74,9 @@ async def score_one(profile: dict, candidate) -> dict | None:
     )
     try:
         data = await asyncio.wait_for(
-            complete_json(SYSTEM, user, max_tokens=400), timeout=PER_CANDIDATE_TIMEOUT
+            # 400 tokens is enough for the answer but not for a reasoning
+            # model's scratchpad, which shares the same budget.
+            complete_json(SYSTEM, user, max_tokens=1600), timeout=PER_CANDIDATE_TIMEOUT
         )
     except asyncio.TimeoutError:
         log.info("scoring timed out for %s", candidate.scholarship.get("slug"))

@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
 
 import httpx
@@ -30,8 +31,8 @@ from sqlalchemy import delete, select
 
 from ..config import settings
 from ..db import Base, SessionLocal, engine
-from ..models import VisaSourceChunk
-from ..orizn import REQUIREMENT_LABELS, _iso3
+from ..models import VisaEvidence, VisaSourceChunk
+from ..orizn import CACHE_TTL, REQUIREMENT_LABELS, _iso3
 
 log = logging.getLogger(__name__)
 
@@ -159,17 +160,127 @@ async def seed_pair(client: httpx.AsyncClient, passport: str, destination: str) 
             )
         )
         db.add_all([VisaSourceChunk(**r) for r in rows])
+
+        # Also prime the STRUCTURED cache, not just the RAG corpus.
+        #
+        # Without this the two halves disagree under load: seeding fills the
+        # narrative corpus while /v1/visa/check still calls Orizn live, so the
+        # moment the free plan returns 429 the endpoint reports "Unknown" even
+        # though we hold a perfectly good, dated answer for that pair. Priming
+        # visa_evidence lets the request path serve the cached verdict (and
+        # flag it stale) instead of losing the answer to a rate limit.
+        evidence = (
+            await db.execute(
+                select(VisaEvidence).where(
+                    VisaEvidence.passport_iso3 == p, VisaEvidence.destination_iso3 == d
+                )
+            )
+        ).scalar_one_or_none()
+        if evidence is None:
+            evidence = VisaEvidence(passport_iso3=p, destination_iso3=d)
+            db.add(evidence)
+
+        now = datetime.now(timezone.utc)
+        verified = data.get("last_verified")
+        evidence.requirement = data.get("requirement")
+        evidence.visa_free_days = data.get("visa_free_days")
+        try:
+            evidence.source_last_verified = (
+                datetime.strptime(verified, "%Y-%m-%d").date() if verified else None
+            )
+        except (TypeError, ValueError):
+            evidence.source_last_verified = None
+        evidence.orizn_payload = data
+        evidence.fetched_at = now
+        evidence.expires_at = now + CACHE_TTL
+
         await db.commit()
     log.info("seeded %s->%s with %s chunks (%s)", p, d, len(rows), path)
     return len(rows)
+
+
+async def repair_evidence() -> int:
+    """Rebuild visa_evidence from chunks already in the corpus, spending no quota.
+
+    The verdict is parsed out of the machine-readable tail we wrote ourselves
+    ("... (visa_required)"), not inferred from prose — so this round-trips our
+    own structured data rather than guessing at it. Useful when the corpus was
+    seeded but the structured cache was not, which otherwise leaves
+    /v1/visa/check reporting Unknown for pairs we demonstrably have an answer
+    for.
+    """
+    now = datetime.now(timezone.utc)
+    repaired = 0
+
+    async with SessionLocal() as db:
+        chunks = (
+            await db.execute(
+                select(VisaSourceChunk).where(VisaSourceChunk.publisher == PUBLISHER)
+            )
+        ).scalars().all()
+
+        by_pair: dict[tuple[str, str], list[VisaSourceChunk]] = {}
+        for c in chunks:
+            if c.passport_iso3:
+                by_pair.setdefault((c.passport_iso3, c.destination_iso3), []).append(c)
+
+        for (p, d), rows in by_pair.items():
+            verdict = next((r for r in rows if "entry requirement" in (r.title or "")), None)
+            if verdict is None:
+                continue
+            m = re.search(r"\((visa_free|visa_required|e_visa|visa_on_arrival|eta|no_admission)\)",
+                          verdict.content or "")
+            if not m:
+                continue
+
+            existing = (
+                await db.execute(
+                    select(VisaEvidence).where(
+                        VisaEvidence.passport_iso3 == p, VisaEvidence.destination_iso3 == d
+                    )
+                )
+            ).scalar_one_or_none()
+            if existing is None:
+                existing = VisaEvidence(passport_iso3=p, destination_iso3=d)
+                db.add(existing)
+
+            existing.requirement = m.group(1)
+            days = re.search(r"Permitted visa-free stay: (\d+) days", verdict.content or "")
+            existing.visa_free_days = int(days.group(1)) if days else None
+            verified = re.search(r"Last verified by the source on (\d{4}-\d{2}-\d{2})",
+                                 verdict.content or "")
+            if verified:
+                try:
+                    existing.source_last_verified = datetime.strptime(
+                        verified.group(1), "%Y-%m-%d").date()
+                except ValueError:
+                    pass
+            existing.orizn_payload = {"requirement": m.group(1),
+                                      "reconstructed_from": "visa_source_chunks"}
+            existing.fetched_at = now
+            existing.expires_at = now + CACHE_TTL
+            repaired += 1
+
+        await db.commit()
+    return repaired
 
 
 async def main() -> None:
     ap = argparse.ArgumentParser(description="Seed visa_source_chunks from Orizn")
     ap.add_argument("--pair", action="append", default=[],
                     help="PASSPORT:DESTINATION, e.g. PAK:CHN")
+    ap.add_argument("--repair-evidence", action="store_true",
+                    help="Rebuild visa_evidence from the existing corpus; uses no API quota")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+
+    if args.repair_evidence:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        n = await repair_evidence()
+        print(f"repaired {n} visa_evidence rows from the existing corpus")
+        await engine.dispose()
+        return
 
     if not settings().orizn_api_key:
         # Fail loudly and usefully. Orizn only allows keyless calls from its own

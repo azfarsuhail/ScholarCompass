@@ -15,11 +15,13 @@ beats vectors on this corpus). Generation is Groq, constrained hard:
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import settings
 from ..llm import complete_json
 from ..models import VisaEvidence, VisaSourceChunk
 
@@ -47,11 +49,34 @@ Hard rules:
 - Never guarantee an outcome. Never invent fees, durations or document names."""
 
 
+def _or_tsquery(query: str) -> str:
+    """Build an OR tsquery from free text.
+
+    plainto_tsquery ANDs every term, so a natural-language question like
+    "student visa requirements documents application process" demanded that all
+    six words appear in one chunk and matched nothing. Retrieval should widen
+    and let ranking sort it out, not silently return an empty set -- an empty
+    set here means the RAG answers nothing at all.
+
+    Terms are stripped to alphanumerics because ':', '&', '|' and '!' are
+    tsquery operators; passing user text through unescaped is both a parse
+    error waiting to happen and an injection into the query language.
+    """
+    terms = [t for t in re.findall(r"[A-Za-z0-9]+", query or "") if len(t) > 2]
+    # Deduplicate while preserving order so ranking is stable.
+    seen: set[str] = set()
+    unique = [t.lower() for t in terms if not (t.lower() in seen or seen.add(t.lower()))]
+    return " | ".join(unique[:24])
+
+
 async def retrieve(
     db: AsyncSession, destination: str, passport: str | None, query: str
 ) -> list[VisaSourceChunk]:
     """Top-K chunks for this destination, preferring passport-specific pages."""
-    ts = func.plainto_tsquery("english", query)
+    expression = _or_tsquery(query)
+    if not expression:
+        return []
+    ts = func.to_tsquery("english", expression)
     stmt = (
         select(VisaSourceChunk, func.ts_rank(VisaSourceChunk.search_vector, ts).label("rank"))
         .where(VisaSourceChunk.destination_iso3 == destination.upper())
@@ -97,7 +122,11 @@ async def answer(
         SYSTEM,
         f"Student passport: {passport}. Destination: {destination}.\n"
         f"Question: {q}\n\nSOURCES\n{_format_sources(chunks)}",
-        max_tokens=700,
+        # rag_model, not the default match model: citation fidelity matters more
+        # here than the latency that governs per-candidate scoring.
+        model=settings().rag_model,
+        # Must cover the model's reasoning tokens as well as the JSON answer.
+        max_tokens=3000,
     )
     if not isinstance(data, dict):
         return None

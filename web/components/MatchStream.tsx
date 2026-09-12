@@ -3,14 +3,14 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { MatchListSkeleton } from "@/components/Skeleton";
 import { MatchCard } from "@/components/MatchCard";
+import { MatchListSkeleton } from "@/components/Skeleton";
 import { API_BASE } from "@/lib/api";
 import type { Enrichment, MatchEvent, RunEvent } from "@/lib/types";
 
 type Status = "idle" | "streaming" | "done" | "error";
 
-export function MatchStream({ ready }: { ready: boolean }) {
+export function MatchStream({ autoStart = false }: { autoStart?: boolean }) {
   const [run, setRun] = useState<RunEvent | null>(null);
   const [matches, setMatches] = useState<MatchEvent[]>([]);
   const [enrichments, setEnrichments] = useState<Record<number, Enrichment>>({});
@@ -42,36 +42,49 @@ export function MatchStream({ ready }: { ready: boolean }) {
       es.close();
     });
     es.onerror = () => {
-      // EventSource auto-reconnects on error, which would restart the whole
-      // run. Close it and let the student retry deliberately instead.
+      // EventSource auto-reconnects on error, which would silently restart the
+      // whole run. Close it and let the student retry deliberately.
       es.close();
       setStatus((s) => (s === "done" ? s : "error"));
     };
   }, []);
 
-  useEffect(() => () => sourceRef.current?.close(), []);
-
-  if (!ready) return null;
+  useEffect(() => {
+    if (autoStart) start();
+    return () => sourceRef.current?.close();
+  }, [autoStart, start]);
 
   const exact = matches.filter((m) => m.is_exact).length;
   const widened = run && run.relaxation_level !== "R0";
 
   return (
-    <section className="mt-8" aria-labelledby="results-heading">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="results-heading" className="text-xl font-bold">
-          Your matches
-        </h2>
+    <section aria-labelledby="results-heading">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 id="results-heading" className="text-3xl font-bold text-balance">
+            Your matches
+          </h1>
+          {run && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-2 text-sm text-muted-foreground"
+            >
+              {matches.length} {matches.length === 1 ? "result" : "results"}
+              {exact > 0 && ` · ${exact} exact`} · checked in {run.deterministic_ms}ms
+            </motion.p>
+          )}
+        </div>
         <button
           type="button"
           onClick={start}
-          className="min-h-11 cursor-pointer rounded-sc bg-accent px-5 font-bold text-on-accent transition-colors duration-200 hover:bg-primary hover:text-on-primary"
+          className="min-h-11 cursor-pointer rounded-sc border border-border px-5 font-bold transition-colors duration-200 hover:border-accent hover:text-accent"
         >
-          {status === "idle" ? "Find matches" : "Search again"}
+          Search again
         </button>
       </div>
 
-      {/* Politely announced once, rather than narrating every arriving card. */}
+      {/* Announced once, politely — not one announcement per arriving card. */}
       <p className="sr-only" role="status" aria-live="polite">
         {status === "streaming"
           ? "Searching for scholarships"
@@ -80,36 +93,37 @@ export function MatchStream({ ready }: { ready: boolean }) {
             : ""}
       </p>
 
-      {run && (
+      {widened && (
         <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="mt-3 text-sm text-muted-foreground"
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4 rounded-sc border border-border bg-card p-3 text-sm text-muted-foreground"
         >
-          {matches.length} {matches.length === 1 ? "result" : "results"}
-          {exact > 0 && ` · ${exact} exact`} · found in {run.deterministic_ms}ms
-          {widened &&
-            " · we widened the search because there were few exact matches"}
+          There were few exact matches, so we widened the search. Everything
+          below is labelled with what it would take.
         </motion.p>
       )}
 
       {status === "error" && (
-        <p className="mt-4 rounded-sc border border-destructive p-3 text-sm text-destructive">
-          The search stopped unexpectedly. Your answers are still here — press
+        <p
+          role="alert"
+          className="mt-4 rounded-sc border border-destructive p-3 text-sm text-destructive"
+        >
+          The search stopped unexpectedly. Your answers are still saved — press
           “Search again”.
         </p>
       )}
 
       {/* Skeletons only before the first card. Once deterministic results are
-          on screen, enrichments fill in beneath them rather than replacing
-          the page with a loading state. */}
+          on screen, enrichments fill in beneath them rather than replacing the
+          page with a loading state. */}
       {status === "streaming" && matches.length === 0 && (
-        <div className="mt-4">
+        <div className="mt-6">
           <MatchListSkeleton count={4} />
         </div>
       )}
 
-      <motion.ul layout className="mt-4 flex flex-col gap-3">
+      <motion.ul layout className="mt-6 flex flex-col gap-3">
         <AnimatePresence initial={false}>
           {matches.map((m) => (
             <MatchCard
@@ -122,7 +136,7 @@ export function MatchStream({ ready }: { ready: boolean }) {
       </motion.ul>
 
       {status === "done" && matches.length === 0 && (
-        <p className="mt-4 rounded-sc border border-border bg-card p-4 text-muted-foreground">
+        <p className="mt-6 rounded-sc border border-border bg-card p-4 text-muted-foreground">
           Nothing matched, even after widening the search. Rather than show you
           opportunities you cannot apply for, we would rather say so — try a
           different degree level or field.

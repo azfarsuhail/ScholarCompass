@@ -53,15 +53,30 @@ async def complete_json(
     user: str,
     *,
     model: str | None = None,
-    max_tokens: int = 1024,
+    max_tokens: int = 2048,
     temperature: float = 0.2,
+    reasoning_effort: str | None = "low",
 ) -> Any | None:
-    """Ask for a JSON object. Returns None if the LLM is unavailable."""
+    """Ask for a JSON object. Returns None if the LLM is unavailable.
+
+    Two Groq-specific details, both learned the hard way against a live key:
+
+      * gpt-oss models are REASONING models. Their reasoning tokens come out of
+        `max_tokens`, so a budget sized for the answer alone lets the model
+        think until it runs out and return an empty completion -- which Groq
+        then rejects as `json_validate_failed` with a blank `failed_generation`.
+        The budget must cover reasoning plus answer, hence the roomy default.
+      * `reasoning_effort="low"` keeps that overhead small. We are asking for
+        structured extraction over supplied text, not a proof.
+    """
     c = client()
     if c is None:
         log.info("groq key not configured; skipping enrichment")
         return None
     try:
+        kwargs: dict[str, Any] = {}
+        if reasoning_effort:
+            kwargs["reasoning_effort"] = reasoning_effort
         resp = await c.chat.completions.create(
             model=model or settings().match_model,
             messages=[
@@ -71,6 +86,7 @@ async def complete_json(
             response_format={"type": "json_object"},
             temperature=temperature,
             max_tokens=max_tokens,
+            **kwargs,
         )
         return _loads(resp.choices[0].message.content or "")
     except (GroqError, json.JSONDecodeError, IndexError) as e:

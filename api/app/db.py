@@ -17,7 +17,9 @@ class Base(DeclarativeBase):
 #    across pooled backends and fail with DuplicatePreparedStatementError.
 #  * pool_recycle beats Neon's idle-connection timeout on scale-to-zero.
 engine = create_async_engine(
-    settings().database_url,
+    # Normalised, not raw: a Neon URL arrives as postgresql:// with libpq-only
+    # sslmode/channel_binding params that asyncpg rejects. See config.py.
+    settings().async_database_url,
     pool_size=5,
     max_overflow=5,
     pool_pre_ping=True,

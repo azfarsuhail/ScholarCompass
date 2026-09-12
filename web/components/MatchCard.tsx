@@ -12,12 +12,26 @@ const TONE_CLASS: Record<string, string> = {
 
 function formatDeadline(m: MatchEvent): string {
   if (m.scholarship.is_rolling) return "Rolling — no fixed deadline";
-  if (!m.scholarship.deadline) return "Deadline not stated";
+  if (!m.scholarship.deadline) {
+    // DAAD publishes a policy rather than a date; the crawler records that
+    // distinction so this does not read as a blank we failed to fill.
+    return m.scholarship.deadline_note
+      ? "Deadline announced annually"
+      : "Deadline not stated";
+  }
   return new Date(m.scholarship.deadline).toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
+}
+
+function hostname(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "official site";
+  }
 }
 
 export function MatchCard({
@@ -37,20 +51,29 @@ export function MatchCard({
       initial={reduced ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-      className="rounded-sc border border-border bg-card p-4"
+      whileHover={reduced ? undefined : { y: -2 }}
+      className="group relative rounded-sc border border-border bg-card p-4 transition-colors duration-200 focus-within:border-accent hover:border-accent"
     >
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-bold text-card-foreground">
+          {/*
+            The handoff. The whole card is the click target via ::after, so
+            there is one unambiguous action per result and no intermediate
+            detail page between the student and the real application form.
+            New tab, not same-tab: a demo (or a student) that loses its results
+            on every outbound click is worse, and rel=noopener is required
+            anyway for an untrusted external origin.
+          */}
           <a
             href={s.source_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="cursor-pointer underline decoration-border underline-offset-4 transition-colors duration-200 hover:decoration-current"
+            className="cursor-pointer underline decoration-border underline-offset-4 transition-colors duration-200 after:absolute after:inset-0 after:content-[''] group-hover:decoration-current"
           >
             {s.title}
           </a>
         </h3>
-        {/* Text carries the meaning; the colour only reinforces it. */}
+        {/* Text carries the meaning; colour only reinforces it. */}
         <span
           className={`shrink-0 rounded-sc border px-2 py-1 text-xs font-bold ${TONE_CLASS[tone]}`}
         >
@@ -81,9 +104,9 @@ export function MatchCard({
       )}
 
       {/*
-        The AI layer. It animates in behind the deterministic card and is
-        always visibly attributed, so a student can tell which parts of the
-        page are database facts and which are a model's opinion.
+        AI layer: animates in behind the deterministic card and is always
+        attributed, so a student can tell which parts are database facts and
+        which are a model's opinion.
       */}
       <AnimatePresence>
         {enrichment && (
@@ -104,6 +127,14 @@ export function MatchCard({
           </motion.div>
         )}
       </AnimatePresence>
+
+      <p className="mt-4 text-sm font-bold text-accent">
+        Apply on {hostname(s.source_url)}{" "}
+        <span aria-hidden="true" className="inline-block transition-transform duration-200 group-hover:translate-x-0.5">
+          ↗
+        </span>
+        <span className="sr-only"> (opens the official application page in a new tab)</span>
+      </p>
     </motion.li>
   );
 }

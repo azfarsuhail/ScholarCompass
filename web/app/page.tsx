@@ -3,10 +3,13 @@
 import * as motion from "motion/react-client";
 import Link from "next/link";
 
+import { HeroReveal } from "@/components/HeroReveal";
+import { retentionLabel } from "@/lib/retention";
+
 const PROOF = [
-  { figure: "237", label: "programmes crawled live", sub: "Erasmus Mundus + DAAD" },
+  { figure: "257", label: "programmes crawled live", sub: "Erasmus Mundus · DAAD · Commonwealth · Eiffel" },
   { figure: "<5s", label: "to first results", sub: "before any AI runs" },
-  { figure: "0", label: "accounts, ever", sub: "nothing kept after 72h" },
+  { figure: "0", label: "accounts, ever", sub: `nothing kept after ${retentionLabel}` },
 ];
 
 const STEPS = [
@@ -46,7 +49,7 @@ export default function Home() {
               ScholarCompass
             </p>
             <h1 className="mt-4 text-4xl font-bold leading-[1.1] text-balance sm:text-6xl">
-              Scholarships you can actually get.
+              <HeroReveal>Scholarships you can actually get.</HeroReveal>
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground">
               Most search tools show you everything and let you find out you were
@@ -122,7 +125,7 @@ export default function Home() {
           <h2 className="font-bold">Why there is no account</h2>
           <p className="mt-2 leading-relaxed text-muted-foreground">
             Your transcript is read in memory and discarded — we keep the grade,
-            never the file. Everything else expires within 72 hours on its own,
+            never the file. Everything else expires within {retentionLabel} on its own,
             and you can erase it instantly at any point. There is no password to
             leak because there is no account to breach.
           </p>

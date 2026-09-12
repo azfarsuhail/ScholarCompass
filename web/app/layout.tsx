@@ -2,9 +2,15 @@ import type { Metadata } from "next";
 import { Atkinson_Hyperlegible } from "next/font/google";
 import "./globals.css";
 
+import { BackgroundFX } from "@/components/BackgroundFX";
+
 // Atkinson Hyperlegible was designed by the Braille Institute to maximise
 // character distinction for low-vision readers. Self-hosted by next/font, so
-// there is no render-blocking request to Google.
+// there is no render-blocking request to Google — which also keeps it off the
+// LCP critical path.
+//
+// shadcn's init added Geist alongside this. Removed: a second webfont is pure
+// LCP cost for a face we do not want to render in anyway.
 const atkinson = Atkinson_Hyperlegible({
   variable: "--font-atkinson",
   subsets: ["latin"],
@@ -20,11 +26,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${atkinson.variable} h-full antialiased`}>
+    <html lang="en" className={`${atkinson.variable} h-full font-sans antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <a href="#main" className="sc-skip-link">
           Skip to main content
         </a>
+        {/* Sits behind every screen. Loads GSAP lazily, so it cannot delay
+            first paint or the LCP element. */}
+        <BackgroundFX />
         {children}
       </body>
     </html>

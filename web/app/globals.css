@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 
 /* ScholarCompass design tokens — "Accessible & Ethical".
    Every pair below is >= 4.5:1 in light and dark. Components must consume the
@@ -19,6 +23,7 @@
   --sc-muted: #e8ecf1;
   --sc-muted-foreground: #475569;
   --sc-border: #e2e8f0;
+  --sc-input: #cbd5e1;
 
   --sc-destructive: #dc2626;
   --sc-on-destructive: #ffffff;
@@ -43,6 +48,32 @@
 
   --sc-radius: 0.625rem;
   --sc-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* --- shadcn/ui contract -------------------------------------------------
+     shadcn components are written against these names. Aliasing them onto the
+     tokens above (rather than keeping the neutral greys its init drops in)
+     means every shadcn input, select and button inherits the accessible
+     palette automatically, instead of running a second, unverified one. */
+  --background: var(--sc-background);
+  --foreground: var(--sc-foreground);
+  --card: var(--sc-card);
+  --card-foreground: var(--sc-card-foreground);
+  --popover: var(--sc-card);
+  --popover-foreground: var(--sc-card-foreground);
+  --primary: var(--sc-accent);
+  --primary-foreground: var(--sc-on-accent);
+  --secondary: var(--sc-muted);
+  --secondary-foreground: var(--sc-foreground);
+  --muted: var(--sc-muted);
+  --muted-foreground: var(--sc-muted-foreground);
+  --accent: var(--sc-muted);
+  --accent-foreground: var(--sc-foreground);
+  --destructive: var(--sc-destructive);
+  --destructive-foreground: var(--sc-on-destructive);
+  --border: var(--sc-border);
+  --input: var(--sc-input);
+  --ring: var(--sc-ring);
+  --radius: var(--sc-radius);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -61,6 +92,7 @@
     --sc-muted: #1e293b;
     --sc-muted-foreground: #a6b6cb;
     --sc-border: #22304a;
+    --sc-input: #3b4c6b;
 
     --sc-destructive: #f87171;
     --sc-on-destructive: #200505;
@@ -79,22 +111,40 @@
   --color-foreground: var(--sc-foreground);
   --color-card: var(--sc-card);
   --color-card-foreground: var(--sc-card-foreground);
+  --color-popover: var(--sc-card);
+  --color-popover-foreground: var(--sc-card-foreground);
   --color-primary: var(--sc-primary);
+  --color-primary-foreground: var(--sc-on-primary);
   --color-on-primary: var(--sc-on-primary);
   --color-secondary: var(--sc-secondary);
+  --color-secondary-foreground: var(--sc-on-secondary);
   --color-accent: var(--sc-accent);
+  --color-accent-foreground: var(--sc-on-accent);
   --color-on-accent: var(--sc-on-accent);
   --color-muted: var(--sc-muted);
   --color-muted-foreground: var(--sc-muted-foreground);
   --color-border: var(--sc-border);
+  --color-input: var(--sc-input);
+  --color-ring: var(--sc-ring);
   --color-destructive: var(--sc-destructive);
+  --color-destructive-foreground: var(--sc-on-destructive);
   --color-success: var(--sc-success);
   --color-warning: var(--sc-warning);
   --color-exact: var(--sc-exact);
   --color-near: var(--sc-near);
   --color-stretch: var(--sc-stretch);
+
   --radius-sc: var(--sc-radius);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+
+  /* Atkinson Hyperlegible stays the sans stack. shadcn's init wires Geist in
+     here; we keep the Braille Institute face because character distinction for
+     low-vision readers outranks house style. */
   --font-sans: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
@@ -118,6 +168,9 @@ body {
   left: -9999px;
   top: var(--sc-space-2);
   z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px; /* touch target floor, same as every other control */
   padding: var(--sc-space-2) var(--sc-space-4);
   background: var(--sc-accent);
   color: var(--sc-on-accent);
@@ -127,7 +180,7 @@ body {
   left: var(--sc-space-2);
 }
 
-/* Skeleton shimmer, used by the Phase 3 streaming placeholders. */
+/* Skeleton shimmer for the streaming and extraction placeholders. */
 @keyframes sc-shimmer {
   100% {
     transform: translateX(100%);

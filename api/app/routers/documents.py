@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
@@ -7,7 +9,10 @@ from starlette.concurrency import run_in_threadpool
 from ..db import get_db
 from ..models import AnonSession, Document
 from ..ocr import MAX_BYTES, extract
+from ..profile_extract import extract_profile
 from ..session import current_session
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/documents", tags=["documents"])
 
@@ -54,19 +59,36 @@ async def upload_document(
         del data
 
     grade = result.grade
+
+    # A CV carries far more than a grade -- institution, degree level, field,
+    # skills, roles. Extracting it is what turns a six-field form into one the
+    # student only has to CHECK. Failure is non-fatal: the grade path still
+    # works and the form simply stays empty.
+    extracted = None
+    if kind in ("resume", "cv"):
+        try:
+            extracted = await extract_profile(result.text, country)
+        except Exception as e:  # noqa: BLE001 - never fail an upload over enrichment
+            log.warning("profile extraction failed: %s", e)
+
     doc = Document(
         session_id=session.id,
         kind=kind,
         filename=file.filename,
         ocr_text=result.text[:20000],
         ocr_confidence=result.confidence,
-        normalized=grade.as_dict() if grade else {},
+        normalized={**(grade.as_dict() if grade else {}),
+                    **({"profile": extracted} if extracted else {})},
     )
     db.add(doc)
 
     # Prefill the profile, but never overwrite a value the student typed
     # themselves -- they know their own transcript better than Tesseract does.
-    if grade and grade.gpa_4 is not None:
+    #
+    # Resumes are excluded on purpose: their extraction goes to the form for
+    # review first, and writing it into the session here would commit data the
+    # student has not seen yet.
+    if kind not in ("resume", "cv") and grade and grade.gpa_4 is not None:
         profile = dict(session.profile or {})
         if profile.get("gpa_4") is None:
             profile["gpa_4"] = grade.gpa_4
@@ -82,7 +104,13 @@ async def upload_document(
         "pages": result.pages,
         "ocr_confidence": result.confidence,
         "grade": grade.as_dict() if grade else None,
+        # Structured profile for the editable form. Null when extraction was
+        # unavailable, which the client treats as "fill it in yourself".
+        "profile": extracted,
         # The UI uses this to decide between "we read your GPA as 3.6" and
         # "we could not read this — please type it in".
         "needs_confirmation": grade is None or grade.confidence < 0.7,
+        # 100 means the PDF had a real text layer, so these are the document's
+        # own characters rather than a recognition guess.
+        "text_layer": result.confidence >= 100,
     }

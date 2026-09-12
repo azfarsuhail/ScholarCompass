@@ -25,6 +25,8 @@ from ..db import SessionLocal, engine
 from ..db import Base
 from ..llm import complete_json
 from ..models import Scholarship
+from ..profile_extract import FIELD_TAGS
+from .catalogue import infer_fields
 from .crawler import fetch, visible_text
 
 log = logging.getLogger(__name__)
@@ -33,8 +35,9 @@ EXTRACT_SYSTEM = """You read scholarship pages and return structured JSON.
 
 Return exactly these keys:
   title, provider, host_country_iso3, degree_levels (array of
-  bachelor|master|phd|postdoc), fields_of_study (array of short lowercase
-  tags), min_gpa_4 (number 0-4 or null), min_language_score (object like
+  bachelor|master|phd|postdoc), fields_of_study (array chosen ONLY from the
+  canonical list given below — free-form tags are discarded),
+  min_gpa_4 (number 0-4 or null), min_language_score (object like
   {"ielts":6.5} or {}), eligible_nationalities (array of ISO3; EMPTY array
   means open to all), excluded_nationalities (array of ISO3), max_age (int or
   null), funding_type (full|partial|tuition|null), deadline (YYYY-MM-DD or
@@ -44,7 +47,12 @@ Rules:
 - Use null when the page does not say. Never invent a cutoff.
 - Do not convert grades. If a GPA is stated on a non-4.0 scale, return null.
 - eligible_nationalities is for explicit restrictions only. A page that merely
-  mentions a country in passing is NOT a restriction."""
+  mentions a country in passing is NOT a restriction.
+
+CANONICAL fields_of_study — use these exact strings and nothing else:
+engineering, computer science, medicine, economics, public policy,
+agriculture, environment, law, physics, chemistry, biology,
+arts and humanities, education, social sciences, mathematics"""
 
 
 def _slug(url: str, title: str) -> str:
@@ -90,7 +98,7 @@ async def crawl(urls: list[str]) -> int:
             log.warning("extraction produced nothing for %s", url)
             continue
 
-        data = _coerce(data)
+        data = _coerce(data, title_hint=str(data.get("title") or ""))
         data.update(
             slug=_slug(page.url, data["title"]),
             source_url=page.url,
@@ -111,7 +119,7 @@ _ALLOWED = {
 }
 
 
-def _coerce(d: dict) -> dict:
+def _coerce(d: dict, title_hint: str = "") -> dict:
     """Drop unknown keys and repair the types models get wrong."""
     out = {k: v for k, v in d.items() if k in _ALLOWED}
     out.setdefault("raw", {})
@@ -136,6 +144,17 @@ def _coerce(d: dict) -> dict:
     out["min_gpa_4"] = gpa if isinstance(gpa, (int, float)) and 0 <= gpa <= 4 else None
     out.setdefault("min_language_score", {})
     out.setdefault("is_rolling", False)
+
+    # Enforce the canonical field vocabulary in code, not just in the prompt.
+    # A model that returns "peace" or "entrepreneurship" is not wrong about the
+    # page -- it is just using words the matcher's filter cannot compare
+    # against, which silently demotes the scholarship to R5 for everyone.
+    canon = set(FIELD_TAGS)
+    tags = [t.lower() for t in out.get("fields_of_study", []) if t.lower() in canon]
+    if not tags:
+        # Fall back to the same deterministic tagger the catalogue crawlers use.
+        tags = infer_fields(title_hint or str(out.get("title") or ""))
+    out["fields_of_study"] = tags[:4]
     return out
 
 

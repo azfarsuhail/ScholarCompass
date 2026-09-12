@@ -69,10 +69,46 @@ def _ocr_image(img: Image.Image) -> tuple[str, list[float]]:
     return " ".join(words), confs
 
 
+# Below this many characters per page, a PDF's text layer is decorative
+# (headers, page numbers) and the real content is an image.
+MIN_TEXT_LAYER_CHARS = 200
+
+
+def _pdf_text_layer(pdf, n: int) -> str:
+    """Read the embedded text layer, if the PDF has a real one.
+
+    Worth trying before OCR for three reasons: a digital PDF (a resume, an
+    e-transcript) gives perfect characters instead of Tesseract's best guess;
+    it costs no bitmap rendering, which is the memory-expensive step; and it
+    works on hosts with no tesseract binary installed at all.
+    """
+    parts = []
+    for i in range(n):
+        page = pdf[i]
+        try:
+            textpage = page.get_textpage()
+            try:
+                parts.append(textpage.get_text_range() or "")
+            finally:
+                textpage.close()
+        except Exception:  # noqa: BLE001 - a missing text layer is normal
+            return ""
+        finally:
+            page.close()
+    return "\n".join(parts).strip()
+
+
 def _pdf_to_text(data: bytes) -> tuple[str, list[float], int]:
     pdf = pdfium.PdfDocument(data)
     try:
         n = min(len(pdf), MAX_PAGES)
+
+        embedded = _pdf_text_layer(pdf, n)
+        if len(embedded) >= MIN_TEXT_LAYER_CHARS:
+            # Confidence 100: these are the document's actual characters, not
+            # a recognition guess.
+            return embedded, [100.0], n
+
         chunks, confs = [], []
         for i in range(n):
             page = pdf[i]

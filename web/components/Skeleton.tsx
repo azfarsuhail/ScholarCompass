@@ -30,6 +30,43 @@ export function MatchCardSkeleton() {
 }
 
 /**
+ * Placeholder for the profile form while a document is being parsed.
+ *
+ * Mirrors the real form's grid so the fields do not jump into place when the
+ * extraction lands — a skeleton with the wrong shape trades a spinner for a
+ * layout shift, which is the worse bug.
+ */
+export function FormSkeleton() {
+  return (
+    <div
+      className="flex flex-col gap-6"
+      aria-busy="true"
+      aria-live="polite"
+      aria-label="Reading your document"
+    >
+      <div className="grid gap-6 sm:grid-cols-2">
+        {Array.from({ length: 8 }, (_, i) => (
+          <div key={i} className="grid gap-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-3 w-40" />
+            <Skeleton className="h-11 w-full" />
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-2">
+        <Skeleton className="h-4 w-32" />
+        <div className="flex flex-wrap gap-2">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} className="h-7 w-24" />
+          ))}
+        </div>
+      </div>
+      <Skeleton className="h-12 w-40" />
+    </div>
+  );
+}
+
+/**
  * The list-level loading state.
  *
  * `aria-busy` + a polite live region means a screen reader announces "Finding

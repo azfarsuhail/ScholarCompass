@@ -40,7 +40,12 @@ export function StepIndicator({ current }: { current: 0 | 1 | 2 }) {
                   aria-current={active ? "step" : undefined}
                   className={[
                     "whitespace-nowrap text-sm",
-                    active ? "font-bold text-foreground" : "text-muted-foreground",
+                    // Three nowrap labels plus connectors overflow a 360px
+                    // screen. Below sm only the CURRENT step is named — the
+                    // numbered circles still carry the sequence, and the
+                    // screen-reader text below is unconditional, so nothing is
+                    // lost for assistive tech.
+                    active ? "font-bold text-foreground" : "hidden text-muted-foreground sm:inline",
                   ].join(" ")}
                 >
                   <span className="sr-only">

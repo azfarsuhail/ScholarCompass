@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { MatchStream } from "@/components/MatchStream";
 import { StepIndicator } from "@/components/StepIndicator";
+import { retentionLabel } from "@/lib/retention";
 
 export default function ResultsPage() {
   return (
@@ -22,8 +23,7 @@ export default function ResultsPage() {
           ← Change my answers
         </Link>
         <p className="text-sm text-muted-foreground">
-          Nothing here is saved to an account. It expires on its own within 72
-          hours.
+          Nothing here is saved to an account. It expires on its own within {retentionLabel}.
         </p>
       </div>
     </main>

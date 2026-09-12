@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, getSession } from "@/lib/api";
 
 export type VisaReadiness = {
   documents: string[];
@@ -62,4 +62,35 @@ export function formatDate(iso: string | null | undefined): string | null {
   return Number.isNaN(d.getTime())
     ? null
     : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+/**
+ * Does the session carry a passport country?
+ *
+ * `/v1/visa/check` falls back to the session's passport when the query omits
+ * one, so without it the endpoint 400s — a wasted round-trip that surfaces as
+ * a generic "could not load" and tells the student nothing about the fix.
+ * Gate on this before calling fetchVisaReadiness.
+ *
+ * One shared promise, like the destination cache above: a results page renders
+ * a dozen cards and the answer is a single session cookie, not a per-card fact.
+ * On failure we return true — we only ever block when we KNOW the passport is
+ * missing, so an unreachable session falls through to the normal error state
+ * rather than accusing the student of an omission they did not make.
+ */
+let passportCheck: Promise<boolean> | null = null;
+
+export function hasPassport(): Promise<boolean> {
+  passportCheck ??= getSession()
+    .then((s) => s.has_passport)
+    .catch(() => {
+      passportCheck = null;
+      return true;
+    });
+  return passportCheck;
+}
+
+/** Call after the profile is saved, so a newly added passport is picked up. */
+export function clearPassportCheck() {
+  passportCheck = null;
 }

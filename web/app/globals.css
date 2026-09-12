@@ -169,6 +169,12 @@
    the tracking percentage.
    ========================================================================== */
 
+html {
+  /* For in-page anchors like /start#passport-country. The reduced-motion
+     block at the end of this file already overrides it back to auto. */
+  scroll-behavior: smooth;
+}
+
 body {
   background: var(--fr-canvas);
   color: var(--fr-ink);

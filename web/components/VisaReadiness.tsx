@@ -1,9 +1,10 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useCallback, useId, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useId, useState } from "react";
 
-import { fetchVisaReadiness, formatDate, type VisaCheck } from "@/lib/visa";
+import { fetchVisaReadiness, formatDate, hasPassport, type VisaCheck } from "@/lib/visa";
 
 /**
  * Progressive disclosure of visa readiness for one scholarship's host country.
@@ -40,11 +41,43 @@ export function VisaReadiness({
   const [data, setData] = useState<VisaCheck | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  // null = not resolved yet. Resolved on mount so the first click is instant;
+  // the promise is shared across every card on the page.
+  const [passport, setPassport] = useState<boolean | null>(null);
+  const [needsPassport, setNeedsPassport] = useState(false);
 
-  const toggle = useCallback(() => {
-    const next = !open;
-    setOpen(next);
-    if (next && !data && !loading && destination) {
+  useEffect(() => {
+    let live = true;
+    hasPassport().then((v) => live && setPassport(v));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const toggle = useCallback(async () => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+
+    /*
+      The gate. Visa requirements are a function of (passport, destination),
+      and /v1/visa/check rejects the call outright when the session carries no
+      passport — so opening the panel without one costs a round-trip and shows
+      a generic failure that hides the one thing the student can act on.
+      Await rather than read state: a click landing before the mount lookup
+      resolves must still be gated, not let through.
+    */
+    const ok = passport ?? (await hasPassport());
+    setPassport(ok);
+    if (!ok) {
+      setNeedsPassport(true);
+      return;
+    }
+
+    setNeedsPassport(false);
+    setOpen(true);
+    if (!data && !loading && destination) {
       setLoading(true);
       setError(false);
       fetchVisaReadiness(destination)
@@ -52,7 +85,7 @@ export function VisaReadiness({
         .catch(() => setError(true))
         .finally(() => setLoading(false));
     }
-  }, [open, data, loading, destination]);
+  }, [open, data, loading, destination, passport]);
 
   const readiness = data?.readiness;
   const verified = formatDate(readiness?.source_last_verified);
@@ -60,6 +93,41 @@ export function VisaReadiness({
 
   return (
     <div className="mt-md border-t border-hairline pt-md">
+      {/*
+        Inline rather than a toast: the missing value belongs to THIS control,
+        and a corner notification detaches the explanation from the button the
+        student just pressed. relative z-10 for the same reason as the button
+        below — the card-wide ::after overlay would otherwise swallow the link.
+      */}
+      <AnimatePresence initial={false}>
+        {needsPassport && (
+          <motion.div
+            key="needs-passport"
+            role="status"
+            aria-live="polite"
+            initial={reduced ? false : { opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            className="relative z-10 overflow-hidden"
+          >
+            <div className="mb-sm flex flex-wrap items-center gap-sm rounded-md border border-hairline bg-surface-2 p-sm">
+              {/* ink-muted #999 on surface-2 #1c1c1c = 6.0:1. */}
+              <p className="fr-body-sm min-w-0 flex-1 text-ink-muted">
+                Please add your passport nationality in your application form to
+                unlock destination-specific visa requirements.
+              </p>
+              <Link
+                href="/start#passport-country"
+                className="fr-btn-secondary shrink-0"
+              >
+                Add passport
+              </Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/*
         relative z-10 is load-bearing. The card title's ::after overlay spans
         the whole card to make it one click target for the handoff; without

@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { clearPassportCheck } from "@/lib/visa";
 import {
   emptyProfile,
   extractionToFormValues,
@@ -126,6 +127,10 @@ export function ProfileForm() {
           experience: parsed.experience,
         }),
       });
+      // The visa gate caches "does this session have a passport?" for the life
+      // of the tab. Without this, a student who came back here to add one would
+      // still be told it is missing — the SPA never remounts to re-read it.
+      clearPassportCheck();
       router.push("/results");
     } catch {
       setSubmitError("Could not save your answers. Check your connection and retry.");
@@ -226,7 +231,11 @@ export function ProfileForm() {
                     control={form.control}
                     name="passport_iso3"
                     render={({ field }) => (
-                      <FormItem>
+                      // Anchor target for the visa gate on a match card, which
+                      // links here when the panel is opened without a passport.
+                      // scroll-mt-xxl keeps the field off the viewport edge so
+                      // its label and description land on screen with it.
+                      <FormItem id="passport-country" className="scroll-mt-xxl">
                         <FormLabel>Passport country</FormLabel>
                         <FormDescription>3-letter code, e.g. PAK</FormDescription>
                         <FormControl>

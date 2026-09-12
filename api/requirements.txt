@@ -1,0 +1,28 @@
+# --- core (512MB container: every dep here is pure-python or tiny C ext) ---
+fastapi==0.121.2
+uvicorn[standard]==0.39.0
+pydantic==2.12.4
+pydantic-settings==2.13.0
+sqlalchemy[asyncio]==2.0.45
+asyncpg==0.30.0
+alembic==1.17.1
+httpx==0.28.1
+python-multipart==0.0.20
+itsdangerous==2.2.0
+
+# --- OCR: tesseract binary + thin wrappers. NO torch. ---
+pytesseract==0.3.13
+pillow==12.1.0
+pypdfium2==5.0.3
+
+# --- RAG retrieval: Postgres full-text search on Neon. No embedding vendor,
+#     because Groq has no embeddings endpoint and a local embedding model
+#     (torch) would blow the 512MB container on its own.
+#     ponytail: FTS + LLM rerank. Add pgvector + a hosted embedder only if
+#     recall measurably falls short.
+
+# --- LLM: Groq LPU inference ---
+groq==0.34.0
+
+# --- crawl fallback only; installed in the ingest image, NOT the api image ---
+# playwright==1.58.0   <- see Dockerfile.ingest

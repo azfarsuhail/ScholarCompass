@@ -10,8 +10,9 @@ from sqlalchemy import delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .config import settings
-from .db import SessionLocal, engine, get_db
+from .db import Base, SessionLocal, engine, get_db
 from .models import AnonSession
+from .routers import documents
 from .session import COOKIE_NAME, SessionCookieMiddleware, current_session
 
 SWEEP_INTERVAL_SECONDS = 900
@@ -39,6 +40,13 @@ async def _sweep_expired() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings().auto_create_schema:
+        # ponytail: create_all is fine while the schema is still moving and
+        # there is no production data. Switch to `alembic upgrade head` in the
+        # release step the first time a column has to change under live rows.
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
     sweeper = asyncio.create_task(_sweep_expired())
     try:
         yield
@@ -65,6 +73,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+app.include_router(documents.router)
 
 
 @app.get("/health")

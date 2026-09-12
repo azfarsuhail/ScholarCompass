@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     session_ttl_hours: int = 72
     # Set false only for plain-HTTP local dev. Any deployed environment is HTTPS.
     cookie_secure: bool = True
+    auto_create_schema: bool = True
 
     orizn_base_url: str = "https://visa.orizn.app"
     orizn_api_key: str | None = None

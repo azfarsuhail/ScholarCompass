@@ -1,0 +1,26 @@
+# Crawler image. Separate from the API image on purpose.
+#
+# Playwright + Chromium is ~400MB installed. Bundling it into the API image
+# would break the 512MB runtime ceiling for a capability the API never uses at
+# request time -- crawling is a scheduled job, not a user-facing path.
+FROM mcr.microsoft.com/playwright/python:v1.58.0-noble
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+COPY requirements.lock.txt .
+RUN pip install --no-cache-dir -r requirements.lock.txt \
+    && pip install --no-cache-dir playwright==1.58.0
+
+COPY app ./app
+
+# Chromium only. The base image ships Firefox and WebKit too; we never use them
+# and they are dead weight in the layer.
+RUN playwright install chromium --with-deps
+
+USER pwuser
+
+ENTRYPOINT ["python", "-m", "app.ingest.run"]

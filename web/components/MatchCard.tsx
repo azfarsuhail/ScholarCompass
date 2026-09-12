@@ -3,6 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { ProviderLogo } from "@/components/ProviderLogo";
+import { VisaReadiness } from "@/components/VisaReadiness";
 import { LEVEL_LABEL, type Enrichment, type MatchEvent } from "@/lib/types";
 
 /**
@@ -60,10 +61,20 @@ export function MatchCard({
 
   return (
     <motion.li
+      // `layout` does double duty here: it animates the card's own height when
+      // the visa panel expands, AND glides the card to its new position when
+      // the list is re-sorted by AI score. Without it, a card that jumps rank
+      // mid-stream simply teleports.
       layout={!reduced}
       initial={reduced ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      transition={{
+        // A spring on layout reads as movement; the opacity fade stays linear
+        // so arriving cards do not feel bouncy.
+        layout: { type: "spring", stiffness: 320, damping: 34, mass: 0.9 },
+        duration: 0.32,
+        ease: [0.22, 1, 0.36, 1],
+      }}
       whileHover={reduced ? undefined : { y: -2 }}
       className="group fr-elev-2 relative rounded-xl bg-surface-1 p-lg transition-colors duration-200 hover:bg-surface-2 focus-within:bg-surface-2"
     >
@@ -142,6 +153,11 @@ export function MatchCard({
           </motion.div>
         )}
       </AnimatePresence>
+
+      <VisaReadiness
+        destination={s.host_country_iso3}
+        scholarshipTitle={s.title}
+      />
 
       {/* accent-blue: hyperlink. The one sanctioned use of the signal colour. */}
       <p className="fr-body-sm mt-md text-accent-blue">

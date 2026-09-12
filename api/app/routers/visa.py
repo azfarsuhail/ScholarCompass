@@ -15,6 +15,7 @@ from ..models import AnonSession
 from ..orizn import REQUIREMENT_LABELS, get_or_fetch
 from ..rag.pipeline import enrich_evidence
 from ..session import current_session
+from ..visa_readiness import readiness
 
 router = APIRouter(prefix="/v1/visa", tags=["visa"])
 
@@ -67,6 +68,13 @@ async def check(
         # Surfaced, not buried: the free plan is licensed for evaluation only.
         "license": (check.payload or {}).get("license"),
     }
+
+    # Structured checklist: documents, proof of funds, process, dates.
+    # Cheap (a single indexed read of the corpus) so it rides along with every
+    # check rather than needing a second round-trip from the card.
+    detail = await readiness(db, p, d)
+    if detail:
+        out["readiness"] = detail
 
     if explain:
         narrative = await enrich_evidence(db, p, d)

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
+import { GeometricBackground } from "@/components/ui/GeometricBackground";
+
 /**
  * Inter Variable, in two roles.
  *
@@ -39,6 +41,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <a href="#main" className="sc-skip-link">
           Skip to main content
         </a>
+        {/* Mounted at the root so it survives route changes: App Router keeps
+            the layout mounted across navigations, so the GSAP timelines are
+            never torn down and restarted. `fixed` anchors it to the viewport
+            so it does not scroll away with the hero. */}
+        <GeometricBackground />
         {children}
       </body>
     </html>

@@ -99,10 +99,18 @@ def _compose(passport: str, destination: str, data: dict, source_url: str) -> li
             "content": "Application process: "
                        + " ".join(f"{i}. {s}" for i, s in enumerate(process, 1)) + ".",
         })
-    if (validity := data.get("passport_validity_months")) is not None:
+    validity = data.get("passport_validity_months")
+    if isinstance(validity, (int, float)):
+        # 0 is a real answer (the UK requires no validity beyond the stay), but
+        # "valid for at least 0 months" reads as broken data, so the two cases
+        # get different sentences.
         chunks.append({
             "title": f"{passport} to {destination}: passport validity",
-            "content": f"Passport must be valid for at least {validity} months.",
+            "content": (
+                f"Passport must be valid for at least {int(validity)} months."
+                if validity > 0
+                else "No passport validity is required beyond the length of the stay."
+            ),
         })
     if embassy := data.get("embassy"):
         apply_at = (embassy or {}).get("visa_application_embassy") or {}

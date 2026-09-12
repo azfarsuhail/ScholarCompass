@@ -5,7 +5,11 @@ import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 
 /**
- * Wireframe geometry behind the hero.
+ * Wireframe geometry behind the whole app.
+ *
+ * Mounted once in the root layout and `fixed inset-0`, so it stays anchored to
+ * the viewport while the page scrolls and survives client-side navigation
+ * without restarting its timelines.
  *
  * DESIGN.md compliance:
  *  - Stroke only. No fills, no gradients, no background colour — "Don't apply
@@ -85,7 +89,7 @@ export function GeometricBackground() {
     <div
       ref={root}
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
     >
       <svg
         viewBox="0 0 800 800"

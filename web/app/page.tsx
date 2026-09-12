@@ -6,7 +6,6 @@ import Link from "next/link";
 
 import { HeroReveal } from "@/components/HeroReveal";
 import { Reveal } from "@/components/Reveal";
-import { GeometricBackground } from "@/components/ui/GeometricBackground";
 import { retentionLabel } from "@/lib/retention";
 
 const PROOF = [
@@ -41,9 +40,9 @@ export default function Home() {
   return (
     <main id="main" className="flex-1">
       {/* Hero — canvas band. On this system the dark canvas IS the whitespace.
-          `relative` establishes the containing block for the geometry layer. */}
+          The geometry layer now lives in the root layout, fixed to the
+          viewport, so it persists across routes rather than remounting here. */}
       <section className="relative mx-auto w-full max-w-[1199px] px-lg py-section sm:px-xl">
-        <GeometricBackground />
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

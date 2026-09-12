@@ -56,6 +56,31 @@ export function MatchStream({ autoStart = false }: { autoStart?: boolean }) {
 
   const exact = matches.filter((m) => m.is_exact).length;
   const widened = run && run.relaxation_level !== "R0";
+  const scoredCount = Object.keys(enrichments).length;
+
+  /**
+   * Rank by AI fit score, descending, as the Groq stream resolves.
+   *
+   * Two rules keep this from thrashing while enrichments trickle in:
+   *  - Unscored cards hold their deterministic order relative to each other
+   *    (by `index`), so the list is stable before any score arrives.
+   *  - Unscored cards sink below scored ones rather than being treated as 0,
+   *    which would shove a not-yet-rated exact match to the bottom and then
+   *    yank it back a second later.
+   *
+   * NOTE: this ranks a high-scoring "stretch" above a lower-scoring exact
+   * match. The eligibility badge stays on every card so the distinction is
+   * never hidden, but it IS a change from ranking eligibility-first.
+   */
+  const ranked = [...matches].sort((a, b) => {
+    const sa = enrichments[a.index]?.score;
+    const sb = enrichments[b.index]?.score;
+    if (sa == null && sb == null) return a.index - b.index;
+    if (sa == null) return 1;
+    if (sb == null) return -1;
+    if (sb !== sa) return sb - sa;
+    return a.index - b.index;
+  });
 
   return (
     <section aria-labelledby="results-heading">
@@ -72,6 +97,7 @@ export function MatchStream({ autoStart = false }: { autoStart?: boolean }) {
             >
               {matches.length} {matches.length === 1 ? "result" : "results"}
               {exact > 0 && ` · ${exact} exact`} · checked in {run.deterministic_ms}ms
+              {scoredCount > 0 && ` · ranked by AI fit (${scoredCount} scored)`}
             </motion.p>
           )}
         </div>
@@ -125,7 +151,7 @@ export function MatchStream({ autoStart = false }: { autoStart?: boolean }) {
 
       <motion.ul layout className="mt-lg flex flex-col gap-md">
         <AnimatePresence initial={false}>
-          {matches.map((m) => (
+          {ranked.map((m) => (
             <MatchCard
               key={m.scholarship.id}
               match={m}

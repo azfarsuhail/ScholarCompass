@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/scholarcompass"
     session_secret: str = "dev-only-not-for-production-use-32b"
     session_ttl_hours: int = 72
+    # Set false only for plain-HTTP local dev. Any deployed environment is HTTPS.
+    cookie_secure: bool = True
 
     orizn_base_url: str = "https://visa.orizn.app"
     orizn_api_key: str | None = None

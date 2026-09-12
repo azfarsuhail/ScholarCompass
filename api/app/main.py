@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .config import settings
 from .db import SessionLocal, engine, get_db
 from .models import AnonSession
-from .session import COOKIE_NAME, current_session
+from .session import COOKIE_NAME, SessionCookieMiddleware, current_session
 
 SWEEP_INTERVAL_SECONDS = 900
 
@@ -53,6 +53,10 @@ app = FastAPI(
     description="Anonymous scholarship + visa discovery. No accounts, ever.",
     lifespan=lifespan,
 )
+
+# Order matters: CORS is added last so it runs OUTERMOST, ensuring the
+# Access-Control-* headers are present even on error responses.
+app.add_middleware(SessionCookieMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

@@ -1,26 +1,168 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ScholarCompass design tokens — "Accessible & Ethical".
+   Every pair below is >= 4.5:1 in light and dark. Components must consume the
+   semantic tokens, never raw hex. */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  --sc-primary: #0f172a;
+  --sc-on-primary: #ffffff;
+  --sc-secondary: #334155;
+  --sc-on-secondary: #ffffff;
+  --sc-accent: #0369a1;
+  --sc-on-accent: #ffffff;
+
+  --sc-background: #f8fafc;
+  --sc-foreground: #020617;
+  --sc-card: #ffffff;
+  --sc-card-foreground: #020617;
+  --sc-muted: #e8ecf1;
+  --sc-muted-foreground: #475569;
+  --sc-border: #e2e8f0;
+
+  --sc-destructive: #dc2626;
+  --sc-on-destructive: #ffffff;
+  --sc-success: #047857;
+  --sc-warning: #b45309;
+  --sc-ring: #0369a1;
+
+  /* Confidence semantics for match results. Never encoded by colour alone —
+     each is always paired with a text label. */
+  --sc-exact: #047857;
+  --sc-near: #0369a1;
+  --sc-stretch: #b45309;
+
+  /* Density 6/10 */
+  --sc-space-1: 0.25rem;
+  --sc-space-2: 0.5rem;
+  --sc-space-3: 0.75rem;
+  --sc-space-4: 1rem;
+  --sc-space-6: 1.5rem;
+  --sc-space-8: 2rem;
+  --sc-space-12: 3rem;
+
+  --sc-radius: 0.625rem;
+  --sc-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --sc-primary: #e2e8f0;
+    --sc-on-primary: #020617;
+    --sc-secondary: #cbd5e1;
+    --sc-on-secondary: #020617;
+    --sc-accent: #38bdf8;
+    --sc-on-accent: #001725;
+
+    --sc-background: #020617;
+    --sc-foreground: #f1f5f9;
+    --sc-card: #0f172a;
+    --sc-card-foreground: #f1f5f9;
+    --sc-muted: #1e293b;
+    --sc-muted-foreground: #a6b6cb;
+    --sc-border: #22304a;
+
+    --sc-destructive: #f87171;
+    --sc-on-destructive: #200505;
+    --sc-success: #34d399;
+    --sc-warning: #fbbf24;
+    --sc-ring: #38bdf8;
+
+    --sc-exact: #34d399;
+    --sc-near: #38bdf8;
+    --sc-stretch: #fbbf24;
   }
 }
 
+@theme inline {
+  --color-background: var(--sc-background);
+  --color-foreground: var(--sc-foreground);
+  --color-card: var(--sc-card);
+  --color-card-foreground: var(--sc-card-foreground);
+  --color-primary: var(--sc-primary);
+  --color-on-primary: var(--sc-on-primary);
+  --color-secondary: var(--sc-secondary);
+  --color-accent: var(--sc-accent);
+  --color-on-accent: var(--sc-on-accent);
+  --color-muted: var(--sc-muted);
+  --color-muted-foreground: var(--sc-muted-foreground);
+  --color-border: var(--sc-border);
+  --color-destructive: var(--sc-destructive);
+  --color-success: var(--sc-success);
+  --color-warning: var(--sc-warning);
+  --color-exact: var(--sc-exact);
+  --color-near: var(--sc-near);
+  --color-stretch: var(--sc-stretch);
+  --radius-sc: var(--sc-radius);
+  --font-sans: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--sc-background);
+  color: var(--sc-foreground);
+  font-family: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem; /* 16px floor — never smaller for body copy */
+  line-height: 1.5;
+}
+
+/* Visible focus is non-negotiable. 3px ring + offset clears both themes. */
+:focus-visible {
+  outline: 3px solid var(--sc-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skip link: present for keyboard users, out of the way for everyone else. */
+.sc-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: var(--sc-space-2);
+  z-index: 100;
+  padding: var(--sc-space-2) var(--sc-space-4);
+  background: var(--sc-accent);
+  color: var(--sc-on-accent);
+  border-radius: var(--sc-radius);
+}
+.sc-skip-link:focus {
+  left: var(--sc-space-2);
+}
+
+/* Skeleton shimmer, used by the Phase 3 streaming placeholders. */
+@keyframes sc-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.sc-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--sc-muted);
+  border-radius: var(--sc-radius);
+}
+.sc-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--sc-card) 60%, transparent),
+    transparent
+  );
+  animation: sc-shimmer 1.6s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .sc-skeleton::after {
+    animation: none;
+  }
 }

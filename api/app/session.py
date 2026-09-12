@@ -98,8 +98,7 @@ class SessionCookieMiddleware:
                         f"Max-Age={settings().session_ttl_hours * 3600}; "
                         "Path=/; HttpOnly; SameSite=Lax"
                     )
-                    # Secure is omitted on localhost only; prod is always HTTPS.
-                    if not settings().cors_origins.startswith("http://localhost"):
+                    if settings().cookie_secure:
                         cookie += "; Secure"
                     message.setdefault("headers", []).append(
                         (b"set-cookie", cookie.encode())

@@ -85,3 +85,76 @@ def test_study_caveat_is_always_present(pak_chn_payload):
     content = _compose("PAK", "CHN", pak_chn_payload, SOURCE)[0]["content"]
     assert "student visa" in content.lower()
     assert "residence permit" in content.lower()
+
+
+# --- refresh worker: date parsing and plan-gated field handling -------------
+
+def test_verified_date_reads_both_field_names():
+    """/check returns `last_verified`; /visa returns `last_verified_at`.
+
+    Reading only the first is why every freshly-seeded row had a NULL
+    verification date despite Orizn supplying one.
+    """
+    from app.ingest.visa_sources import _verified_date
+
+    assert _verified_date({"last_verified": "2026-05-08"}).isoformat() == "2026-05-08"
+    assert (
+        _verified_date({"last_verified_at": "2026-05-10T13:37:46.882Z"}).isoformat()
+        == "2026-05-10"
+    )
+    assert _verified_date({}) is None
+    assert _verified_date({"last_verified": "not a date"}) is None
+
+
+def test_upsell_stubs_are_never_stored_as_data():
+    """Free-plan responses put an upsell STRING where the list should be.
+
+    Joining a string iterates its characters, which would store
+    "7; ; d; o; c..." as a document checklist.
+    """
+    from app.ingest.visa_sources import _compose
+
+    stub = {
+        "requirement": "visa_required",
+        "documents_required": "7 documents — upgrade for full list",
+        "process": "5 steps — upgrade for details",
+    }
+    titles = [c["title"] for c in _compose("PAK", "CHN", stub, "http://x")]
+    assert not any("documents required" in t for t in titles)
+    assert not any("application process" in t for t in titles)
+
+    real = {
+        "requirement": "visa_required",
+        "documents_required": ["Valid passport", "Proof of sufficient funds"],
+        "process": ["Apply", "Wait"],
+    }
+    titles = [c["title"] for c in _compose("PAK", "CHN", real, "http://x")]
+    assert any("documents required" in t for t in titles)
+    assert any("application process" in t for t in titles)
+
+
+def test_zero_month_validity_gets_its_own_sentence():
+    """0 is a real answer (the UK needs none beyond the stay), not missing data."""
+    from app.ingest.visa_sources import _compose
+
+    zero = _compose("PAK", "GBR", {"requirement": "visa_required",
+                                   "passport_validity_months": 0}, "http://x")
+    text = " ".join(c["content"] for c in zero)
+    assert "at least 0 months" not in text
+    assert "No passport validity is required" in text
+
+    six = _compose("PAK", "CHN", {"requirement": "visa_required",
+                                  "passport_validity_months": 6}, "http://x")
+    assert "at least 6 months" in " ".join(c["content"] for c in six)
+
+
+def test_fetch_classifies_failures():
+    """429 ends the run; 5xx and transport errors are skipped past."""
+    from app.ingest.visa_sources import Fetch
+
+    assert Fetch(None, 429).quota_exhausted
+    assert not Fetch(None, 429).transient
+    assert Fetch(None, 500).transient
+    assert Fetch(None, 503).transient
+    assert Fetch(None, 0).transient
+    assert not Fetch({"requirement": "visa_free"}, 200).transient

@@ -36,4 +36,11 @@ EXPOSE 8000
 #     512MB. Scale by running more containers, not more workers per container.
 #   * The workload is IO-bound (Neon, Groq, Orizn), so async concurrency inside
 #     one worker is what actually buys throughput here.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+#
+# Shell form so $PORT expands. Hosts that assign a port (SnapDeploy and most
+# container PaaS) inject it as $PORT and route only to that port -- and the
+# exec form this replaced would have passed the literal string "$PORT" to
+# uvicorn, or silently kept listening on 8000 while the platform sent traffic
+# somewhere else. That failure looks like a healthy container serving nothing.
+# The default keeps `docker run -p 8000:8000` and docker-compose working.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]

@@ -1,0 +1,11 @@
+# Crawler-only dependencies. Deliberately NOT in requirements.txt.
+#
+# Playwright + Chromium is ~400MB installed, which does not fit beside FastAPI
+# in the 512MB SnapDeploy container -- and the API never drives a browser at
+# request time (crawler.py imports playwright lazily for exactly this reason).
+# Installed only by the weekly GitHub Actions scraper and Dockerfile.ingest.
+#
+# Pinned to the same version as Dockerfile.ingest's base image. A mismatch
+# between the python package and the installed browser build fails at launch
+# with "Executable doesn't exist", so the two must move together.
+playwright==1.58.0

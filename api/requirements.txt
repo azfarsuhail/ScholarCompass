@@ -33,4 +33,6 @@ pytest>=8.3
 pytest-asyncio>=0.24
 respx>=0.22
 
-# playwright lives in the ingest image only -- see Dockerfile.ingest
+# playwright is NOT here on purpose -- it would blow the 512MB API container.
+# See requirements-scraper.txt, installed only by Dockerfile.ingest and the
+# weekly GitHub Actions scraper.

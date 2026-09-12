@@ -1,0 +1,78 @@
+# Weekly scholarship refresh.
+#
+# The crawlers need Playwright + Chromium (~400MB) and several minutes of
+# wall-clock. The API runs in a 512MB SnapDeploy container and cannot host
+# either, so the scrape happens here and writes straight to Neon. Nothing is
+# deployed by this workflow -- it only refreshes rows the API already serves.
+name: Weekly scraper
+
+on:
+  schedule:
+    # Sundays 00:00 UTC.
+    - cron: '0 0 * * 0'
+  # Manual trigger for the demo. Note GitHub only offers this on the workflow
+  # file as it exists on the default branch.
+  workflow_dispatch:
+
+# Two runs writing the same rows at once buys nothing and doubles the load on
+# the target sites. A scheduled run that collides with a manual one waits.
+concurrency:
+  group: weekly-scraper
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    # The crawl is serial by design, so it is slow by design. This ceiling is
+    # here to kill a hung browser, not to bound normal work (~15-25 min).
+    timeout-minutes: 60
+
+    defaults:
+      run:
+        working-directory: api
+
+    env:
+      # config.py normalises the raw Neon URL: it rewrites the scheme to
+      # +asyncpg and converts libpq-only sslmode/channel_binding params, so the
+      # secret can be pasted from the Neon console unedited.
+      DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      # Only the flagship crawl uses the LLM (it reads prose pages into typed
+      # columns). The Erasmus/DAAD catalogue crawlers are deterministic.
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      PYTHONUNBUFFERED: '1'
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            api/requirements.lock.txt
+            api/requirements-scraper.txt
+
+      - name: Install dependencies
+        # The lock file is what Dockerfile.ingest installs, so CI and the
+        # ingest image resolve to the same versions. Playwright is kept out of
+        # it and out of requirements.txt -- see requirements-scraper.txt.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock.txt -r requirements-scraper.txt
+
+      - name: Install Chromium and system dependencies
+        # Chromium only. The crawlers never touch Firefox or WebKit, and
+        # --with-deps pulls the apt libraries a bare runner lacks.
+        run: python -m playwright install --with-deps chromium
+
+      - name: Crawl Erasmus Mundus and DAAD
+        # Serial on purpose: one browser, one tab, one page at a time. These
+        # are government and EU sites that rate-limit or block parallel
+        # scraping, and a throttled runner returns empty pages, not errors.
+        run: python -m app.ingest.catalogue --erasmus --daad
+
+      - name: Crawl flagship programmes
+        # Chevening, Fulbright, Eiffel, MEXT, CSC. Runs even if the catalogue
+        # step failed -- one site being down should not cost us the other six.
+        if: ${{ !cancelled() }}
+        run: python -m app.ingest.run --flagship

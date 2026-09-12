@@ -26,7 +26,7 @@ from ..db import Base
 from ..llm import complete_json
 from ..models import Scholarship
 from ..profile_extract import FIELD_TAGS
-from .catalogue import infer_fields
+from .catalogue import dedupe_by_slug, infer_fields
 from .crawler import fetch, visible_text
 
 log = logging.getLogger(__name__)
@@ -84,6 +84,9 @@ async def _upsert(rows: list[dict], merge: bool = False) -> int:
     """
     if not rows:
         return 0
+    # Guards seed.json and any future batching; crawl() passes one row at a
+    # time, so the merge=True coalesce above is unaffected.
+    rows = dedupe_by_slug(rows)
     async with SessionLocal() as db:
         stmt = insert(Scholarship).values(rows)
         cols = [k for k in rows[0] if k not in ("id", "slug")]

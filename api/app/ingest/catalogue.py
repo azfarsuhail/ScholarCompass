@@ -117,10 +117,25 @@ def _slug(prefix: str, key: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", f"{prefix}-{key}".lower()).strip("-")[:200]
 
 
+def dedupe_by_slug(rows: list[dict]) -> list[dict]:
+    """Collapse repeated slugs so one statement never touches a row twice.
+
+    Postgres refuses an ON CONFLICT DO UPDATE that affects the same row twice
+    ("cannot affect row a second time") and aborts the ENTIRE statement, so a
+    single duplicated card costs the whole flush -- and on a weekly unattended
+    run nobody is watching to retry. The Erasmus catalogue repeats programmes
+    across pages, which is exactly how this happens in practice.
+
+    Last occurrence wins: later pages are the fresher read of the same page.
+    """
+    return list({r["slug"]: r for r in rows}.values())
+
+
 async def _upsert(rows: list[dict]) -> int:
     """Idempotent by slug, so re-crawling refreshes rather than duplicates."""
     if not rows:
         return 0
+    rows = dedupe_by_slug(rows)
     async with SessionLocal() as db:
         stmt = insert(Scholarship).values(rows)
         stmt = stmt.on_conflict_do_update(
@@ -484,6 +499,14 @@ def _demo() -> None:
     assert infer_fields("") == []
     # Never tag so broadly that everything matches.
     assert len(infer_fields("engineering computer medicine law physics economics art")) <= 4
+
+    # A repeated slug in one batch must collapse, keeping the LAST read, or
+    # Postgres aborts the whole flush on the weekly run.
+    batch = [{"slug": "a", "title": "stale"}, {"slug": "b", "title": "b"},
+             {"slug": "a", "title": "fresh"}]
+    assert dedupe_by_slug(batch) == [{"slug": "a", "title": "fresh"},
+                                     {"slug": "b", "title": "b"}]
+    assert dedupe_by_slug([]) == []
 
     print("catalogue deadline-parsing self-check passed")
 

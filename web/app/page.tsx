@@ -4,6 +4,7 @@ import * as motion from "motion/react-client";
 import Link from "next/link";
 
 import { HeroReveal } from "@/components/HeroReveal";
+import { Reveal } from "@/components/Reveal";
 import { retentionLabel } from "@/lib/retention";
 
 const PROOF = [
@@ -76,40 +77,32 @@ export default function Home() {
           </motion.div>
 
           {/* Proof row */}
-          <motion.dl
-            className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-3"
-            initial="hidden"
-            animate="visible"
-            variants={{ visible: { transition: { staggerChildren: 0.08, delayChildren: 0.2 } } }}
-          >
+          {/* GSAP stagger, fired on mount because this sits above the fold. */}
+          <Reveal immediate delay={0.35} stagger="[data-proof]" className="mt-14 block">
+            <dl className="grid grid-cols-1 gap-6 sm:grid-cols-3">
             {PROOF.map((p) => (
-              <motion.div
-                key={p.label}
-                variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
-                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              >
+              <div key={p.label} data-proof>
                 <dt className="text-3xl font-bold text-foreground">{p.figure}</dt>
                 <dd className="mt-1 text-sm text-muted-foreground">
                   {p.label}
                   <span className="block text-xs opacity-80">{p.sub}</span>
                 </dd>
-              </motion.div>
+              </div>
             ))}
-          </motion.dl>
+            </dl>
+          </Reveal>
         </div>
       </section>
 
       {/* How it works */}
       <section className="mx-auto w-full max-w-3xl px-6 py-16">
         <h2 className="text-2xl font-bold">How it works</h2>
+        <Reveal stagger="[data-step]">
         <ol className="mt-8 flex flex-col gap-8">
-          {STEPS.map((s, i) => (
-            <motion.li
+          {STEPS.map((s) => (
+            <li
               key={s.n}
-              initial={{ opacity: 0, y: 14 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-80px" }}
-              transition={{ duration: 0.4, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+              data-step
               className="flex gap-5 border-l-2 border-border pl-5"
             >
               <div>
@@ -117,11 +110,13 @@ export default function Home() {
                 <h3 className="mt-1 text-lg font-bold">{s.title}</h3>
                 <p className="mt-2 leading-relaxed text-muted-foreground">{s.body}</p>
               </div>
-            </motion.li>
+            </li>
           ))}
         </ol>
+        </Reveal>
 
-        <div className="mt-12 rounded-sc border border-border bg-card p-6">
+        <Reveal className="mt-12 block">
+        <div className="rounded-sc border border-border bg-card p-6">
           <h2 className="font-bold">Why there is no account</h2>
           <p className="mt-2 leading-relaxed text-muted-foreground">
             Your transcript is read in memory and discarded — we keep the grade,
@@ -136,6 +131,7 @@ export default function Home() {
             Start now →
           </Link>
         </div>
+        </Reveal>
       </section>
 
       <footer className="border-t border-border">

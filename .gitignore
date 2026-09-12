@@ -22,3 +22,6 @@ uploads/
 
 .playwright-mcp/
 *.png
+
+# Personal documents — never commit. Test fixtures live outside the repo.
+*.pdf

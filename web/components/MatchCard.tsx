@@ -5,10 +5,22 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { LEVEL_LABEL, type Enrichment, type MatchEvent } from "@/lib/types";
 
+/**
+ * Match card — DESIGN.md {components.product-mockup-tile}: surface-1 ground,
+ * rounded-xl, level-2 elevation (light top edge + drop shadow).
+ *
+ * Hierarchy on this dark canvas is carried by ink → ink-muted, never by
+ * opacity on white type. The level badge therefore uses SURFACE LIFT to mark
+ * an exact match rather than a chromatic fill — DESIGN.md reserves blue for
+ * links, focus and selection, and forbids a second accent family. The label
+ * text still carries the meaning, so nothing is encoded by colour alone.
+ */
+
 const TONE_CLASS: Record<string, string> = {
-  exact: "border-exact text-exact",
-  near: "border-near text-near",
-  stretch: "border-stretch text-stretch",
+  // surface-2 = lift = "exact". Muted charcoal = a stretch.
+  exact: "bg-surface-2 text-ink",
+  near: "bg-surface-1 text-ink-muted",
+  stretch: "bg-surface-1 text-ink-muted",
 };
 
 function formatDeadline(m: MatchEvent): string {
@@ -53,56 +65,53 @@ export function MatchCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       whileHover={reduced ? undefined : { y: -2 }}
-      className="group relative rounded-sc border border-border bg-card p-4 transition-colors duration-200 focus-within:border-accent hover:border-accent"
+      className="group fr-elev-2 relative rounded-xl bg-surface-1 p-lg transition-colors duration-200 hover:bg-surface-2 focus-within:bg-surface-2"
     >
-      <div className="flex items-start gap-3">
-        <ProviderLogo
-          domain={s.provider_domain}
-          name={s.provider ?? s.title}
-          size={40}
-        />
-        <h3 className="min-w-0 flex-1 font-bold text-card-foreground">
+      <div className="flex items-start gap-sm">
+        <ProviderLogo domain={s.provider_domain} name={s.provider ?? s.title} size={40} />
+
+        <h3 className="fr-headline min-w-0 flex-1 text-ink">
           {/*
             The handoff. The whole card is the click target via ::after, so
             there is one unambiguous action per result and no intermediate
             detail page between the student and the real application form.
-            New tab, not same-tab: a demo (or a student) that loses its results
-            on every outbound click is worse, and rel=noopener is required
-            anyway for an untrusted external origin.
+            New tab: a student who loses their results on every outbound click
+            is worse off, and rel=noopener is required for an external origin.
           */}
           <a
             href={s.source_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="cursor-pointer underline decoration-border underline-offset-4 transition-colors duration-200 after:absolute after:inset-0 after:content-[''] group-hover:decoration-current"
+            className="cursor-pointer after:absolute after:inset-0 after:content-['']"
           >
             {s.title}
           </a>
         </h3>
-        {/* Text carries the meaning; colour only reinforces it. */}
+
+        {/* Surface lift, not colour fill. Text carries the meaning. */}
         <span
-          className={`shrink-0 rounded-sc border px-2 py-1 text-xs font-bold ${TONE_CLASS[tone]}`}
+          className={`fr-caption shrink-0 rounded-pill px-sm py-xxs ${TONE_CLASS[tone]}`}
         >
           {label}
         </span>
       </div>
 
-      <p className="mt-1 text-sm text-muted-foreground">
+      <p className="fr-body-sm mt-sm text-ink-muted">
         {[s.provider, s.host_country_iso3].filter(Boolean).join(" · ")}
         {" · "}
         {formatDeadline(match)}
       </p>
 
       {match.notes.map((n) => (
-        <p key={n} className="mt-2 text-sm text-warning">
+        <p key={n} className="fr-body-sm mt-sm text-ink">
           {n}
         </p>
       ))}
 
       {match.gaps.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-1">
+        <ul className="mt-sm flex flex-col gap-xxs">
           {match.gaps.map((g) => (
-            <li key={g} className="text-sm text-muted-foreground">
+            <li key={g} className="fr-body-sm text-ink-muted">
               — {g}
             </li>
           ))}
@@ -123,9 +132,9 @@ export function MatchCard({
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <div className="mt-3 border-t border-border pt-3">
-              <p className="text-sm text-card-foreground">{enrichment.rationale}</p>
-              <p className="mt-2 text-xs text-muted-foreground">
+            <div className="mt-md border-t border-hairline pt-md">
+              <p className="fr-body text-ink">{enrichment.rationale}</p>
+              <p className="fr-micro mt-xs text-ink-muted">
                 AI-assessed fit: {Math.round(enrichment.score)}/100 · not an
                 eligibility decision
               </p>
@@ -134,9 +143,13 @@ export function MatchCard({
         )}
       </AnimatePresence>
 
-      <p className="mt-4 text-sm font-bold text-accent">
+      {/* accent-blue: hyperlink. The one sanctioned use of the signal colour. */}
+      <p className="fr-body-sm mt-md text-accent-blue">
         Apply on {hostname(s.source_url)}{" "}
-        <span aria-hidden="true" className="inline-block transition-transform duration-200 group-hover:translate-x-0.5">
+        <span
+          aria-hidden="true"
+          className="inline-block transition-transform duration-200 group-hover:translate-x-0.5"
+        >
           ↗
         </span>
         <span className="sr-only"> (opens the official application page in a new tab)</span>

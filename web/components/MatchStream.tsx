@@ -59,16 +59,16 @@ export function MatchStream({ autoStart = false }: { autoStart?: boolean }) {
 
   return (
     <section aria-labelledby="results-heading">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-md">
         <div>
-          <h1 id="results-heading" className="text-3xl font-bold text-balance">
+          <h1 id="results-heading" className="fr-display-lg text-ink">
             Your matches
           </h1>
           {run && (
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="mt-2 text-sm text-muted-foreground"
+              className="fr-body-sm mt-xs text-ink-muted"
             >
               {matches.length} {matches.length === 1 ? "result" : "results"}
               {exact > 0 && ` · ${exact} exact`} · checked in {run.deterministic_ms}ms
@@ -78,7 +78,7 @@ export function MatchStream({ autoStart = false }: { autoStart?: boolean }) {
         <button
           type="button"
           onClick={start}
-          className="min-h-11 cursor-pointer rounded-sc border border-border px-5 font-bold transition-colors duration-200 hover:border-accent hover:text-accent"
+          className="fr-btn-secondary"
         >
           Search again
         </button>
@@ -97,7 +97,7 @@ export function MatchStream({ autoStart = false }: { autoStart?: boolean }) {
         <motion.p
           initial={{ opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-4 rounded-sc border border-border bg-card p-3 text-sm text-muted-foreground"
+          className="fr-body-sm mt-md rounded-md bg-surface-1 p-md text-ink-muted"
         >
           There were few exact matches, so we widened the search. Everything
           below is labelled with what it would take.
@@ -107,7 +107,7 @@ export function MatchStream({ autoStart = false }: { autoStart?: boolean }) {
       {status === "error" && (
         <p
           role="alert"
-          className="mt-4 rounded-sc border border-destructive p-3 text-sm text-destructive"
+          className="fr-body-sm mt-md rounded-md border border-destructive p-md text-destructive"
         >
           The search stopped unexpectedly. Your answers are still saved — press
           “Search again”.
@@ -118,12 +118,12 @@ export function MatchStream({ autoStart = false }: { autoStart?: boolean }) {
           on screen, enrichments fill in beneath them rather than replacing the
           page with a loading state. */}
       {status === "streaming" && matches.length === 0 && (
-        <div className="mt-6">
+        <div className="mt-lg">
           <MatchListSkeleton count={4} />
         </div>
       )}
 
-      <motion.ul layout className="mt-6 flex flex-col gap-3">
+      <motion.ul layout className="mt-lg flex flex-col gap-md">
         <AnimatePresence initial={false}>
           {matches.map((m) => (
             <MatchCard
@@ -136,7 +136,7 @@ export function MatchStream({ autoStart = false }: { autoStart?: boolean }) {
       </motion.ul>
 
       {status === "done" && matches.length === 0 && (
-        <p className="mt-6 rounded-sc border border-border bg-card p-4 text-muted-foreground">
+        <p className="fr-body mt-lg rounded-xl bg-surface-1 p-lg text-ink-muted">
           Nothing matched, even after widening the search. Rather than show you
           opportunities you cannot apply for, we would rather say so — try a
           different degree level or field.

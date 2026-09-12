@@ -39,10 +39,10 @@ import {
   type ProfileValues,
 } from "@/lib/schema";
 
-// shadcn inputs default to h-8 (32px). That fails the 44px minimum touch
-// target, so every control here is raised explicitly rather than relying on
-// the default.
-const CONTROL = "min-h-11";
+// DESIGN.md {components.text-input}: surface-1 ground, 10px/14px padding,
+// rounded-md, blue level-3 focus ring. .fr-input also floors the height at
+// 44px, which the documented 10px padding alone would miss.
+const CONTROL = "fr-input";
 
 const SPRING = { type: "spring" as const, stiffness: 320, damping: 30, mass: 0.8 };
 
@@ -155,7 +155,7 @@ export function ProfileForm() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-xl">
       <DocumentUpload
         onParsingChange={setParsing}
         onExtracted={onExtracted}
@@ -188,14 +188,14 @@ export function ProfileForm() {
             transition={SPRING}
           >
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-6">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-lg">
                 {autofilled.length > 0 && (
                   <motion.p
                     initial={reduced ? false : { opacity: 0, y: -6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={SPRING}
                     role="status"
-                    className="rounded-sc border border-accent/40 bg-accent/5 p-3 text-sm"
+                    className="fr-card fr-body-sm !p-md text-ink"
                   >
                     We filled in {autofilled.length} section
                     {autofilled.length === 1 ? "" : "s"} from your document.
@@ -204,7 +204,7 @@ export function ProfileForm() {
                   </motion.p>
                 )}
 
-                <div className="grid gap-6 sm:grid-cols-2">
+                <div className="grid gap-lg sm:grid-cols-2">
                   <FormField
                     control={form.control}
                     name="full_name"
@@ -416,7 +416,7 @@ export function ProfileForm() {
                             >
                               <input
                                 type="checkbox"
-                                className="size-4 cursor-pointer accent-[var(--sc-accent)]"
+                                className="size-4 cursor-pointer accent-[var(--fr-accent-blue)]"
                                 checked={checked}
                                 onChange={(e) => {
                                   const next = e.target.checked
@@ -511,7 +511,7 @@ export function ProfileForm() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, height: 0 }}
                             transition={SPRING}
-                            className="grid gap-2 rounded-sc border border-border p-3 sm:grid-cols-[1fr_1fr_auto]"
+                            className="fr-tile grid gap-sm sm:grid-cols-[1fr_1fr_auto]"
                           >
                             <div className="grid gap-1">
                               <Label htmlFor={`exp-role-${index}`} className="text-xs text-muted-foreground">
@@ -553,7 +553,7 @@ export function ProfileForm() {
                 )}
 
                 {submitError && (
-                  <p role="alert" className="rounded-sc border border-destructive p-3 text-destructive">
+                  <p role="alert" className="fr-body-sm rounded-md border border-destructive p-md text-destructive">
                     {submitError}
                   </p>
                 )}

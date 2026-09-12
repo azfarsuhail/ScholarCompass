@@ -1,20 +1,27 @@
 import type { Metadata } from "next";
-import { Atkinson_Hyperlegible } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
-import { BackgroundFX } from "@/components/BackgroundFX";
-
-// Atkinson Hyperlegible was designed by the Braille Institute to maximise
-// character distinction for low-vision readers. Self-hosted by next/font, so
-// there is no render-blocking request to Google — which also keeps it off the
-// LCP critical path.
-//
-// shadcn's init added Geist alongside this. Removed: a second webfont is pure
-// LCP cost for a face we do not want to render in anyway.
-const atkinson = Atkinson_Hyperlegible({
-  variable: "--font-atkinson",
+/**
+ * Inter Variable, in two roles.
+ *
+ * DESIGN.md specifies GT Walsheim Medium for display and Inter Variable for
+ * body, and explicitly sanctions the substitution: "suitable open-source
+ * substitutes include Mona Sans, Geist, or Inter at weight 600–700 with
+ * manually tightened tracking. Inter Variable is open-source — keep it as-is
+ * and preserve the documented OpenType variants."
+ *
+ * One family covering both roles is also the cheapest possible answer to the
+ * 2.5s LCP budget: a second display webfont would be pure critical-path cost.
+ *
+ * NOTE: this replaces Atkinson Hyperlegible. See the handover notes — it is a
+ * real trade for low-vision readers, made because DESIGN.md governs here.
+ */
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400", "700"],
+  // 400 body · 500 body-sm/caption/button · 600–700 display substitute.
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -26,14 +33,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${atkinson.variable} h-full font-sans antialiased`}>
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+    // DESIGN.md is dark-only: "Don't ship a light-mode marketing page."
+    <html lang="en" className={`${inter.variable} h-full`}>
+      <body className="flex min-h-full flex-col bg-canvas text-ink">
         <a href="#main" className="sc-skip-link">
           Skip to main content
         </a>
-        {/* Sits behind every screen. Loads GSAP lazily, so it cannot delay
-            first paint or the LCP element. */}
-        <BackgroundFX />
         {children}
       </body>
     </html>

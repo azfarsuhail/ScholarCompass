@@ -19,11 +19,14 @@ import { useState } from "react";
 const CLIENT_ID = process.env.NEXT_PUBLIC_BRANDFETCH_CLIENT_ID;
 
 /** Deterministic tint per provider, so a card's logo colour is stable. */
+// DESIGN.md forbids a second chromatic accent family, so the fallback marks
+// identity by surface lift and ink level rather than by tinting each brand a
+// different colour.
 const TINTS = [
-  "bg-[color-mix(in_srgb,var(--sc-accent)_14%,transparent)] text-accent",
-  "bg-[color-mix(in_srgb,var(--sc-exact)_14%,transparent)] text-exact",
-  "bg-[color-mix(in_srgb,var(--sc-stretch)_16%,transparent)] text-stretch",
-  "bg-[color-mix(in_srgb,var(--sc-near)_14%,transparent)] text-near",
+  "bg-surface-2 text-ink",
+  "bg-surface-2 text-ink-muted",
+  "bg-surface-1 text-ink",
+  "bg-surface-1 text-ink-muted",
 ];
 
 function initials(name: string): string {
@@ -58,7 +61,7 @@ export function ProviderLogo({
       <span
         aria-hidden="true"
         style={{ width: size, height: size }}
-        className={`grid shrink-0 place-items-center rounded-sc border border-border text-sm font-bold ${tint}`}
+        className={`fr-caption grid shrink-0 place-items-center rounded-md ${tint}`}
       >
         {initials(name)}
       </span>
@@ -81,7 +84,7 @@ export function ProviderLogo({
       decoding="async"
       onError={() => setFailed(true)}
       style={{ width: size, height: size }}
-      className="shrink-0 rounded-sc border border-border bg-card object-contain p-1"
+      className="shrink-0 rounded-md bg-surface-2 object-contain p-1"
     />
   );
 }

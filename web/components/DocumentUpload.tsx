@@ -95,12 +95,12 @@ export function DocumentUpload({
         if (f) void upload(f);
       }}
       className={[
-        "rounded-sc border border-dashed p-5 transition-colors duration-200",
-        dragging ? "border-accent bg-accent/5" : "border-border bg-card",
+        "rounded-xl border border-dashed p-lg transition-colors duration-200",
+        dragging ? "border-accent-blue bg-surface-2" : "border-hairline bg-surface-1",
       ].join(" ")}
     >
-      <h2 className="font-bold">Start from your CV or transcript</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
+      <h2 className="fr-headline text-ink">Start from your CV or transcript</h2>
+      <p className="fr-body-sm mt-xxs text-ink-muted">
         We read it, fill the form in, and discard the file — it is never stored.
         Drag it here or choose a file. PDF or image, up to 10MB.
       </p>
@@ -119,17 +119,17 @@ export function DocumentUpload({
         }}
       />
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="mt-md flex flex-wrap items-center gap-sm">
         <Button
           type="button"
           variant="outline"
           disabled={busy}
-          className="min-h-11"
+          className="fr-btn-secondary"
           onClick={() => inputRef.current?.click()}
         >
           {busy ? "Reading…" : "Choose a file"}
         </Button>
-        <span className="text-sm text-muted-foreground">or skip and type it in below</span>
+        <span className="fr-body-sm text-ink-muted">or skip and type it in below</span>
       </div>
 
       <p className="sr-only" role="status" aria-live="polite">
@@ -144,14 +144,14 @@ export function DocumentUpload({
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="mt-4 flex items-center gap-3 border-t border-border pt-4">
+            <div className="mt-md flex items-center gap-sm border-t border-hairline-soft pt-md">
               <motion.span
                 aria-hidden="true"
-                className="size-2 rounded-full bg-accent"
+                className="size-2 rounded-full bg-accent-blue"
                 animate={reduced ? {} : { scale: [1, 1.6, 1], opacity: [1, 0.4, 1] }}
                 transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
               />
-              <p className="text-sm text-muted-foreground">
+              <p className="fr-body-sm text-ink-muted">
                 Extracting your education, skills and experience…
               </p>
             </div>
@@ -163,7 +163,7 @@ export function DocumentUpload({
             initial={reduced ? false : { opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="mt-4 border-t border-border pt-4 text-sm text-success"
+            className="fr-body-sm mt-md border-t border-hairline-soft pt-md text-success"
           >
             {status}
           </motion.p>
@@ -171,7 +171,7 @@ export function DocumentUpload({
       </AnimatePresence>
 
       {error && (
-        <p role="alert" className="mt-4 text-sm text-destructive">
+        <p role="alert" className="fr-body-sm mt-md text-destructive">
           {error}
         </p>
       )}

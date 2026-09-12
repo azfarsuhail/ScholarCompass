@@ -2,185 +2,447 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* ============================================================================
+   ScholarCompass — Framer design system (DESIGN.md, version: alpha)
+   ----------------------------------------------------------------------------
+   Tailwind v4 has no tailwind.config.ts; theme tokens live in @theme here.
+   A config file would be inert unless pulled in with @config, so this IS the
+   Tailwind configuration.
 
-/* ScholarCompass design tokens — "Accessible & Ethical".
-   Every pair below is >= 4.5:1 in light and dark. Components must consume the
-   semantic tokens, never raw hex. */
+   DESIGN.md is dark-only ("Don't ship a light-mode marketing page. Framer's
+   identity is dark."), so there is deliberately no prefers-color-scheme block
+   and no light palette. Removing it is the spec, not an omission.
+
+   Contrast, measured against DESIGN.md's own values:
+     ink-muted #999999 on canvas #090909     6.98:1
+     accent-blue #0099ff on canvas #090909   6.63:1
+     ink-muted #999999 on surface-1 #141414  6.55:1
+   All clear 4.5:1, so the brand palette and the accessibility constraint do
+   not actually conflict.
+   ========================================================================== */
 
 :root {
-  --sc-primary: #0f172a;
-  --sc-on-primary: #ffffff;
-  --sc-secondary: #334155;
-  --sc-on-secondary: #ffffff;
-  --sc-accent: #0369a1;
-  --sc-on-accent: #ffffff;
+  color-scheme: dark;
 
-  --sc-background: #f8fafc;
-  --sc-foreground: #020617;
-  --sc-card: #ffffff;
-  --sc-card-foreground: #020617;
-  --sc-muted: #e8ecf1;
-  --sc-muted-foreground: #475569;
-  --sc-border: #e2e8f0;
-  --sc-input: #cbd5e1;
+  /* --- colors (DESIGN.md > colors) ------------------------------------- */
+  --fr-primary: #ffffff;
+  --fr-on-primary: #000000;
+  --fr-accent-blue: #0099ff;
+  --fr-ink: #ffffff;
+  --fr-ink-muted: #999999;
+  --fr-canvas: #090909;
+  --fr-surface-1: #141414;
+  --fr-surface-2: #1c1c1c;
+  --fr-hairline: #262626;
+  --fr-hairline-soft: #1a1a1a;
+  --fr-inverse-canvas: #ffffff;
+  --fr-inverse-ink: #000000;
+  --fr-gradient-magenta: #d44df0;
+  --fr-gradient-violet: #6a4cf5;
+  --fr-gradient-orange: #ff7a3d;
+  --fr-gradient-coral: #ff5577;
+  --fr-success: #22c55e;
 
-  --sc-destructive: #dc2626;
-  --sc-on-destructive: #ffffff;
-  --sc-success: #047857;
-  --sc-warning: #b45309;
-  --sc-ring: #0369a1;
+  /* --- spacing (5px base: 5/10/15/20/30, not 4/8/16/24) ---------------- */
+  --fr-hair: 1px;
+  --fr-xxs: 4px;
+  --fr-xs: 8px;
+  --fr-sm: 12px;
+  --fr-md: 15px;
+  --fr-lg: 20px;
+  --fr-xl: 30px;
+  --fr-xxl: 40px;
+  --fr-section: 96px;
 
-  /* Confidence semantics for match results. Never encoded by colour alone —
-     each is always paired with a text label. */
-  --sc-exact: #047857;
-  --sc-near: #0369a1;
-  --sc-stretch: #b45309;
+  /* --- radius ---------------------------------------------------------- */
+  --fr-r-xs: 4px;
+  --fr-r-sm: 6px;
+  --fr-r-md: 10px;
+  --fr-r-lg: 15px;
+  --fr-r-xl: 20px;
+  --fr-r-xxl: 30px;
+  --fr-r-pill: 100px;
+  --fr-r-full: 9999px;
 
-  /* Density 6/10 */
-  --sc-space-1: 0.25rem;
-  --sc-space-2: 0.5rem;
-  --sc-space-3: 0.75rem;
-  --sc-space-4: 1rem;
-  --sc-space-6: 1.5rem;
-  --sc-space-8: 2rem;
-  --sc-space-12: 3rem;
+  /* --- elevation (DESIGN.md > Elevation & Depth) ------------------------
+     0 flat · 1 charcoal lift · 2 light-edge + drop · 3 blue selection ring */
+  --fr-elev-2:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.1),
+    0 10px 30px rgba(0, 0, 0, 0.25);
+  --fr-elev-3: 0 0 0 1px rgba(0, 153, 255, 0.15);
 
-  --sc-radius: 0.625rem;
-  --sc-ease: cubic-bezier(0.22, 1, 0.36, 1);
-
-  /* --- shadcn/ui contract -------------------------------------------------
-     shadcn components are written against these names. Aliasing them onto the
-     tokens above (rather than keeping the neutral greys its init drops in)
-     means every shadcn input, select and button inherits the accessible
-     palette automatically, instead of running a second, unverified one. */
-  --background: var(--sc-background);
-  --foreground: var(--sc-foreground);
-  --card: var(--sc-card);
-  --card-foreground: var(--sc-card-foreground);
-  --popover: var(--sc-card);
-  --popover-foreground: var(--sc-card-foreground);
-  --primary: var(--sc-accent);
-  --primary-foreground: var(--sc-on-accent);
-  --secondary: var(--sc-muted);
-  --secondary-foreground: var(--sc-foreground);
-  --muted: var(--sc-muted);
-  --muted-foreground: var(--sc-muted-foreground);
-  --accent: var(--sc-muted);
-  --accent-foreground: var(--sc-foreground);
-  --destructive: var(--sc-destructive);
-  --destructive-foreground: var(--sc-on-destructive);
-  --border: var(--sc-border);
-  --input: var(--sc-input);
-  --ring: var(--sc-ring);
-  --radius: var(--sc-radius);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --sc-primary: #e2e8f0;
-    --sc-on-primary: #020617;
-    --sc-secondary: #cbd5e1;
-    --sc-on-secondary: #020617;
-    --sc-accent: #38bdf8;
-    --sc-on-accent: #001725;
-
-    --sc-background: #020617;
-    --sc-foreground: #f1f5f9;
-    --sc-card: #0f172a;
-    --sc-card-foreground: #f1f5f9;
-    --sc-muted: #1e293b;
-    --sc-muted-foreground: #a6b6cb;
-    --sc-border: #22304a;
-    --sc-input: #3b4c6b;
-
-    --sc-destructive: #f87171;
-    --sc-on-destructive: #200505;
-    --sc-success: #34d399;
-    --sc-warning: #fbbf24;
-    --sc-ring: #38bdf8;
-
-    --sc-exact: #34d399;
-    --sc-near: #38bdf8;
-    --sc-stretch: #fbbf24;
-  }
+  /* --- shadcn/ui contract, aliased onto the Framer tokens ---------------
+     shadcn components are written against these names. Pointing them at the
+     tokens above means every input, select and button inherits the Framer
+     surface ladder rather than running a second, unverified palette. */
+  --background: var(--fr-canvas);
+  --foreground: var(--fr-ink);
+  --card: var(--fr-surface-1);
+  --card-foreground: var(--fr-ink);
+  --popover: var(--fr-surface-2);
+  --popover-foreground: var(--fr-ink);
+  /* Primary is WHITE, per DESIGN.md. Blue is a signal colour, never a fill. */
+  --primary: var(--fr-primary);
+  --primary-foreground: var(--fr-on-primary);
+  --secondary: var(--fr-surface-1);
+  --secondary-foreground: var(--fr-ink);
+  --muted: var(--fr-surface-1);
+  --muted-foreground: var(--fr-ink-muted);
+  --accent: var(--fr-surface-2);
+  --accent-foreground: var(--fr-ink);
+  --destructive: #ff5577;
+  --destructive-foreground: var(--fr-on-primary);
+  --border: var(--fr-hairline);
+  --input: var(--fr-hairline);
+  --ring: var(--fr-accent-blue);
+  --radius: var(--fr-r-md);
 }
 
 @theme inline {
-  --color-background: var(--sc-background);
-  --color-foreground: var(--sc-foreground);
-  --color-card: var(--sc-card);
-  --color-card-foreground: var(--sc-card-foreground);
-  --color-popover: var(--sc-card);
-  --color-popover-foreground: var(--sc-card-foreground);
-  --color-primary: var(--sc-primary);
-  --color-primary-foreground: var(--sc-on-primary);
-  --color-on-primary: var(--sc-on-primary);
-  --color-secondary: var(--sc-secondary);
-  --color-secondary-foreground: var(--sc-on-secondary);
-  --color-accent: var(--sc-accent);
-  --color-accent-foreground: var(--sc-on-accent);
-  --color-on-accent: var(--sc-on-accent);
-  --color-muted: var(--sc-muted);
-  --color-muted-foreground: var(--sc-muted-foreground);
-  --color-border: var(--sc-border);
-  --color-input: var(--sc-input);
-  --color-ring: var(--sc-ring);
-  --color-destructive: var(--sc-destructive);
-  --color-destructive-foreground: var(--sc-on-destructive);
-  --color-success: var(--sc-success);
-  --color-warning: var(--sc-warning);
-  --color-exact: var(--sc-exact);
-  --color-near: var(--sc-near);
-  --color-stretch: var(--sc-stretch);
+  --color-canvas: var(--fr-canvas);
+  --color-surface-1: var(--fr-surface-1);
+  --color-surface-2: var(--fr-surface-2);
+  --color-hairline: var(--fr-hairline);
+  --color-hairline-soft: var(--fr-hairline-soft);
+  --color-ink: var(--fr-ink);
+  --color-ink-muted: var(--fr-ink-muted);
+  --color-accent-blue: var(--fr-accent-blue);
+  --color-magenta: var(--fr-gradient-magenta);
+  --color-violet: var(--fr-gradient-violet);
+  --color-orange: var(--fr-gradient-orange);
+  --color-coral: var(--fr-gradient-coral);
+  --color-success: var(--fr-success);
 
-  --radius-sc: var(--sc-radius);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
+  --color-background: var(--fr-canvas);
+  --color-foreground: var(--fr-ink);
+  --color-card: var(--fr-surface-1);
+  --color-card-foreground: var(--fr-ink);
+  --color-popover: var(--fr-surface-2);
+  --color-popover-foreground: var(--fr-ink);
+  --color-primary: var(--fr-primary);
+  --color-primary-foreground: var(--fr-on-primary);
+  --color-secondary: var(--fr-surface-1);
+  --color-secondary-foreground: var(--fr-ink);
+  --color-muted: var(--fr-surface-1);
+  --color-muted-foreground: var(--fr-ink-muted);
+  --color-accent: var(--fr-surface-2);
+  --color-accent-foreground: var(--fr-ink);
+  --color-destructive: #ff5577;
+  --color-border: var(--fr-hairline);
+  --color-input: var(--fr-hairline);
+  --color-ring: var(--fr-accent-blue);
 
-  /* Atkinson Hyperlegible stays the sans stack. shadcn's init wires Geist in
-     here; we keep the Braille Institute face because character distinction for
-     low-vision readers outranks house style. */
-  --font-sans: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
-  --font-heading: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+  /* Spacing scale on Framer's 5px rhythm. */
+  --spacing-hair: var(--fr-hair);
+  --spacing-xxs: var(--fr-xxs);
+  --spacing-xs: var(--fr-xs);
+  --spacing-sm: var(--fr-sm);
+  --spacing-md: var(--fr-md);
+  --spacing-lg: var(--fr-lg);
+  --spacing-xl: var(--fr-xl);
+  --spacing-xxl: var(--fr-xxl);
+  --spacing-section: var(--fr-section);
+
+  --radius-xs: var(--fr-r-xs);
+  --radius-sm: var(--fr-r-sm);
+  --radius-md: var(--fr-r-md);
+  --radius-lg: var(--fr-r-lg);
+  --radius-xl: var(--fr-r-xl);
+  --radius-xxl: var(--fr-r-xxl);
+  --radius-pill: var(--fr-r-pill);
+  --radius-full: var(--fr-r-full);
+
+  --shadow-elev-2: var(--fr-elev-2);
+  --shadow-elev-3: var(--fr-elev-3);
+
+  /* One family in two roles. DESIGN.md permits Inter 600–700 with manually
+     tightened tracking as the GT Walsheim substitute, and a single webfont is
+     also the cheapest thing we can do to the LCP budget. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
+
+/* ============================================================================
+   Typography — DESIGN.md > Typography > Hierarchy
+   Letter-spacing is expressed as a percentage of size so it survives the
+   responsive step-down: DESIGN.md is explicit that you reduce the SIZE, never
+   the tracking percentage.
+   ========================================================================== */
 
 body {
-  background: var(--sc-background);
-  color: var(--sc-foreground);
-  font-family: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
-  font-size: 1rem; /* 16px floor — never smaller for body copy */
-  line-height: 1.5;
+  background: var(--fr-canvas);
+  color: var(--fr-ink);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* body: 15px / 1.30 / -0.15px */
+  font-size: 15px;
+  line-height: 1.3;
+  letter-spacing: -0.15px;
+  /* "OpenType character variants are the brand voice. Switching off cv11,
+     ss03, etc. visibly changes the body voice — the brand depends on them." */
+  font-feature-settings: "cv01", "cv05", "cv09", "cv11", "ss03", "ss07", "dlig";
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Visible focus is non-negotiable. 3px ring + offset clears both themes. */
+.fr-display-xxl {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2rem, 9vw, 110px); /* display-md 32px → display-xxl 110px */
+  line-height: 0.85;
+  letter-spacing: -0.05em; /* -5.5px at 110px */
+}
+.fr-display-xl {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2rem, 7vw, 85px);
+  line-height: 0.95;
+  letter-spacing: -0.05em; /* -4.25px at 85px */
+}
+.fr-display-lg {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.75rem, 5vw, 62px);
+  line-height: 1;
+  letter-spacing: -0.05em; /* -3.1px at 62px */
+}
+.fr-display-md {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 32px;
+  line-height: 1.13;
+  letter-spacing: -0.031em; /* -1.0px at 32px */
+}
+.fr-headline {
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: -0.8px;
+  font-feature-settings: "cv05";
+}
+.fr-subhead {
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 1.3;
+  letter-spacing: -0.01px;
+}
+.fr-body-lg {
+  font-weight: 400;
+  font-size: 18px;
+  line-height: 1.3;
+  letter-spacing: -0.18px;
+}
+.fr-body {
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.3;
+  letter-spacing: -0.15px;
+}
+.fr-body-sm {
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1.4;
+  letter-spacing: -0.14px;
+}
+.fr-caption {
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1.2;
+  letter-spacing: -0.13px;
+}
+.fr-micro {
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: -0.12px;
+}
+
+/* ============================================================================
+   Components — DESIGN.md > Components
+   ========================================================================== */
+
+/* button-primary: white pill on dark. The only primary CTA shape. */
+.fr-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fr-xs);
+  background: var(--fr-primary);
+  color: var(--fr-on-primary);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.14px;
+  padding: 10px var(--fr-md);
+  border-radius: var(--fr-r-pill);
+  /* DESIGN.md > Responsive > Touch Targets: pills hold >=44px at every
+     viewport, so the documented 10px padding is floored rather than trusted. */
+  min-height: 44px;
+  cursor: pointer;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+.fr-btn-primary:hover {
+  opacity: 0.9;
+}
+/* "the live site uses a transform-scale shrink rather than a darkened fill" */
+.fr-btn-primary:active {
+  transform: scale(0.97);
+}
+.fr-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* button-secondary: charcoal pill. Never a bordered ghost button. */
+.fr-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fr-xs);
+  background: var(--fr-surface-1);
+  color: var(--fr-ink);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.14px;
+  padding: 10px var(--fr-md);
+  border-radius: var(--fr-r-pill);
+  min-height: 44px;
+  cursor: pointer;
+  transition: background 150ms ease, transform 150ms ease;
+}
+.fr-btn-secondary:hover {
+  background: var(--fr-surface-2);
+}
+.fr-btn-secondary:active {
+  transform: scale(0.97);
+}
+
+/* button-translucent: lifted secondary for busy/gradient grounds. */
+.fr-btn-translucent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fr-surface-2);
+  color: var(--fr-ink);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.14px;
+  padding: var(--fr-xs) 14px;
+  border-radius: var(--fr-r-xxl);
+  min-height: 44px;
+  cursor: pointer;
+}
+
+/* text-input + text-input-focused. Focus ring is the level-3 blue shadow. */
+.fr-input {
+  width: 100%;
+  background: var(--fr-surface-1);
+  color: var(--fr-ink);
+  font-size: 15px;
+  line-height: 1.3;
+  letter-spacing: -0.15px;
+  padding: 10px 14px;
+  border: 1px solid var(--fr-hairline);
+  border-radius: var(--fr-r-md);
+  min-height: 44px;
+  transition: box-shadow 150ms ease, border-color 150ms ease;
+}
+.fr-input::placeholder {
+  color: var(--fr-ink-muted);
+}
+.fr-input:focus-visible {
+  outline: none;
+  border-color: var(--fr-accent-blue);
+  /* Level 3 selection ring, widened enough to be a visible focus indicator —
+     DESIGN.md's 1px @ 15% alpha alone would not read as focus. */
+  box-shadow: 0 0 0 3px rgba(0, 153, 255, 0.35);
+}
+
+/* Cards. Surface lift marks hierarchy on dark — never opacity on white type. */
+.fr-card {
+  background: var(--fr-surface-1);
+  color: var(--fr-ink);
+  border-radius: var(--fr-r-xl);
+  padding: 24px;
+}
+.fr-card-featured {
+  background: var(--fr-surface-2);
+}
+.fr-tile {
+  background: var(--fr-surface-1);
+  color: var(--fr-ink);
+  border-radius: var(--fr-r-lg);
+  padding: 12px;
+}
+/* Level 2: light top edge + drop. Floating / product cards. */
+.fr-elev-2 {
+  box-shadow: var(--fr-elev-2);
+}
+
+/* gradient-spotlight-card — the signature atmosphere device.
+   SCARCE BY DESIGN: "One or two per long page is the spec; three is a
+   moodboard." Cards only; never a section ground. */
+.fr-spotlight {
+  border-radius: var(--fr-r-xxl);
+  padding: var(--fr-xl);
+  color: var(--fr-ink);
+}
+/* Gradient stops are DARKENED from DESIGN.md's raw anchors so that pure white
+   ink clears 4.5:1 at EVERY stop, not just at the midpoint.
+
+   The spec's own magenta #d44df0 gives white only 3.45:1, and its violet
+   #6a4cf5 passes at 5.35:1 but fails as soon as a lighter stop is introduced.
+   DESIGN.md anticipates this: "Treat the documented {colors.gradient-*} hex
+   values as base anchors, not as exact gradient specs." So the hue and the
+   device are kept; the luminance is pulled down until the contrast constraint
+   holds. Every stop below is >= 4.8:1 against white.
+
+   background-color is also declared so the card still has a valid, measurable
+   ground if the gradient fails to paint. */
+.fr-spotlight-violet {
+  background-color: #5a3fd6;
+  background-image: radial-gradient(120% 120% at 20% 10%, #6f52e8 0%, #5a3fd6 55%, #2e1a7a 100%);
+}
+.fr-spotlight-magenta {
+  background-color: #a33bbd;
+  background-image: radial-gradient(120% 120% at 80% 10%, #ad43c4 0%, #a33bbd 55%, #5f1d72 100%);
+}
+.fr-spotlight-orange {
+  background-color: #b8501f;
+  background-image: radial-gradient(120% 120% at 30% 90%, #c75c26 0%, #b8501f 55%, #6d2a0b 100%);
+}
+
+/* Hyperlinks: the one place accent-blue belongs. */
+.fr-link {
+  color: var(--fr-accent-blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Global focus. Blue is the brand's only chromatic signal. */
 :focus-visible {
-  outline: 3px solid var(--sc-ring);
+  outline: 2px solid var(--fr-accent-blue);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--fr-r-xs);
 }
 
-/* Skip link: present for keyboard users, out of the way for everyone else. */
 .sc-skip-link {
   position: absolute;
   left: -9999px;
-  top: var(--sc-space-2);
+  top: var(--fr-xs);
   z-index: 100;
   display: inline-flex;
   align-items: center;
-  min-height: 44px; /* touch target floor, same as every other control */
-  padding: var(--sc-space-2) var(--sc-space-4);
-  background: var(--sc-accent);
-  color: var(--sc-on-accent);
-  border-radius: var(--sc-radius);
+  min-height: 44px;
+  padding: 10px var(--fr-md);
+  background: var(--fr-primary);
+  color: var(--fr-on-primary);
+  border-radius: var(--fr-r-pill);
 }
 .sc-skip-link:focus {
-  left: var(--sc-space-2);
+  left: var(--fr-xs);
 }
 
-/* Skeleton shimmer for the streaming and extraction placeholders. */
+/* Skeletons sit on the surface ladder, not on a tinted grey. */
 @keyframes sc-shimmer {
   100% {
     transform: translateX(100%);
@@ -189,20 +451,15 @@ body {
 .sc-skeleton {
   position: relative;
   overflow: hidden;
-  background: var(--sc-muted);
-  border-radius: var(--sc-radius);
+  background: var(--fr-surface-1);
+  border-radius: var(--fr-r-md);
 }
 .sc-skeleton::after {
   content: "";
   position: absolute;
   inset: 0;
   transform: translateX(-100%);
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--sc-card) 60%, transparent),
-    transparent
-  );
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
   animation: sc-shimmer 1.6s infinite;
 }
 

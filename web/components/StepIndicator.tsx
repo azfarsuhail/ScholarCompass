@@ -15,7 +15,7 @@ export function StepIndicator({ current }: { current: 0 | 1 | 2 }) {
   const reduced = useReducedMotion();
 
   return (
-    <nav aria-label="Progress" className="mb-10">
+    <nav aria-label="Progress" className="mb-xl">
       <ol className="flex items-center gap-2 sm:gap-3">
         {STEPS.map((label, i) => {
           const done = i < current;
@@ -25,13 +25,15 @@ export function StepIndicator({ current }: { current: 0 | 1 | 2 }) {
               <div className="flex items-center gap-2">
                 <span
                   aria-hidden="true"
+                  // pricing-tab semantics: selected = surface LIFT, not a
+                  // chromatic fill. DESIGN.md keeps blue for signal only.
                   className={[
-                    "grid size-7 shrink-0 place-items-center rounded-full border text-xs font-bold transition-colors duration-300",
+                    "grid size-8 shrink-0 place-items-center rounded-full text-xs font-medium transition-colors duration-200",
                     done
-                      ? "border-accent bg-accent text-on-accent"
+                      ? "bg-primary text-primary-foreground"
                       : active
-                        ? "border-accent text-accent"
-                        : "border-border text-muted-foreground",
+                        ? "bg-surface-2 text-ink"
+                        : "bg-surface-1 text-ink-muted",
                   ].join(" ")}
                 >
                   {done ? "✓" : i + 1}
@@ -45,7 +47,7 @@ export function StepIndicator({ current }: { current: 0 | 1 | 2 }) {
                     // numbered circles still carry the sequence, and the
                     // screen-reader text below is unconditional, so nothing is
                     // lost for assistive tech.
-                    active ? "font-bold text-foreground" : "hidden text-muted-foreground sm:inline",
+                    active ? "fr-body-sm text-ink" : "fr-body-sm hidden text-ink-muted sm:inline",
                   ].join(" ")}
                 >
                   <span className="sr-only">
@@ -56,9 +58,9 @@ export function StepIndicator({ current }: { current: 0 | 1 | 2 }) {
               </div>
 
               {i < STEPS.length - 1 && (
-                <div className="relative h-px flex-1 bg-border" aria-hidden="true">
+                <div className="relative h-px flex-1 bg-hairline" aria-hidden="true">
                   <motion.div
-                    className="absolute inset-y-0 left-0 bg-accent"
+                    className="absolute inset-y-0 left-0 bg-primary"
                     initial={reduced ? false : { width: 0 }}
                     animate={{ width: done ? "100%" : "0%" }}
                     transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}

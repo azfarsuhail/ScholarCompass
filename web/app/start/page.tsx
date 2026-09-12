@@ -9,14 +9,14 @@ export const metadata = {
 
 export default function StartPage() {
   return (
-    <main id="main" className="mx-auto w-full max-w-2xl flex-1 px-6 py-12">
+    <main id="main" className="mx-auto w-full max-w-[760px] flex-1 px-lg py-xxl sm:px-xl">
       <StepIndicator current={0} />
 
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-balance">
+      <div className="mb-xl">
+        <h1 className="fr-display-lg text-ink">
           Tell us enough to filter, no more
         </h1>
-        <p className="mt-2 text-muted-foreground">
+        <p className="fr-body-lg mt-sm text-ink-muted">
           Every field is optional. Blank means “don’t filter on this” — we never
           guess a value you didn’t give us.
         </p>

@@ -17,7 +17,7 @@ export function Skeleton({ className = "" }: { className?: string }) {
 /** Placeholder for one streaming match card. Matches MatchCard's box exactly. */
 export function MatchCardSkeleton() {
   return (
-    <div className="rounded-sc border border-border bg-card p-4">
+    <div className="rounded-xl bg-surface-1 p-lg">
       <div className="flex items-start justify-between gap-4">
         <Skeleton className="h-5 w-2/3" />
         <Skeleton className="h-6 w-16 shrink-0" />
@@ -39,12 +39,12 @@ export function MatchCardSkeleton() {
 export function FormSkeleton() {
   return (
     <div
-      className="flex flex-col gap-6"
+      className="flex flex-col gap-lg"
       aria-busy="true"
       aria-live="polite"
       aria-label="Reading your document"
     >
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="grid gap-lg sm:grid-cols-2">
         {Array.from({ length: 8 }, (_, i) => (
           <div key={i} className="grid gap-2">
             <Skeleton className="h-4 w-24" />
@@ -75,7 +75,7 @@ export function FormSkeleton() {
 export function MatchListSkeleton({ count = 4 }: { count?: number }) {
   return (
     <div
-      className="flex flex-col gap-3"
+      className="flex flex-col gap-md"
       aria-busy="true"
       aria-live="polite"
       aria-label="Finding scholarships"

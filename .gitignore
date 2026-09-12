@@ -25,3 +25,6 @@ uploads/
 
 # Personal documents — never commit. Test fixtures live outside the repo.
 *.pdf
+
+# Source art. The optimised derivative lives in web/public/images/.
+/hero.jpg

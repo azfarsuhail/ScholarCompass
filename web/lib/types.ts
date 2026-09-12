@@ -16,6 +16,11 @@ export type Scholarship = {
    *  (DAAD: "deadlines are updated annually"). Distinguishes "announced
    *  later" from "we could not find one". */
   deadline_note?: string | null;
+  /** Bare domain for the Brandfetch logo hotlink (never an image URL). */
+  provider_domain?: string | null;
+  min_work_experience_hours?: number | null;
+  return_obligation?: string | null;
+  entry_requirement?: string | null;
 };
 
 export type MatchEvent = {

@@ -127,6 +127,24 @@ class Scholarship(Base):
     deadline: Mapped[date | None] = mapped_column(Date, index=True)
     is_rolling: Mapped[bool] = mapped_column(default=False)
 
+    # --- flagship-programme gates -------------------------------------------
+    # Chevening requires 2,800 hours of work experience and rejects outright
+    # without it, so this is a real filter rather than a preference.
+    min_work_experience_hours: Mapped[int | None] = mapped_column(Integer)
+    # Chevening's two-year return rule, Fulbright's J-1 home-residency rule.
+    # NEVER filtered on -- it does not affect eligibility, but a student must
+    # know it before committing years of their life, so it is always shown.
+    return_obligation: Mapped[str | None] = mapped_column(Text)
+    # Prose entry requirement (e.g. Fulbright's "bachelor's equivalent").
+    # Shown, not parsed: encoding it as a filter would need a degree-
+    # equivalence table we do not have and would guess wrong.
+    entry_requirement: Mapped[str | None] = mapped_column(Text)
+
+    # Bare domain (ox.ac.uk, chevening.org) used to hotlink a provider logo
+    # from Brandfetch's CDN. Stored as a domain, never as an image: the 512MB
+    # container has no business holding binary assets.
+    provider_domain: Mapped[str | None] = mapped_column(String(120))
+
     source_url: Mapped[str] = mapped_column(Text)
     # Continuous verification: how fresh is this row, and did JS rendering
     # (Playwright) produce it or a plain HTTP fetch?

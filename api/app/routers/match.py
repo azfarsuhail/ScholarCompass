@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 from datetime import date, datetime, timezone
 from typing import Any
@@ -61,7 +62,19 @@ def _row_to_dict(s: Scholarship) -> dict:
         # Lets the UI distinguish "the publisher announces this later" from
         # "we could not find a deadline". See ingest/catalogue.py.
         "deadline_note": (s.raw or {}).get("deadline_note"),
+        # Domain only. The logo is hotlinked from Brandfetch's CDN by the
+        # browser, so no image bytes ever touch this 512MB container.
+        "provider_domain": s.provider_domain or _domain_of(s.source_url),
+        "min_work_experience_hours": s.min_work_experience_hours,
+        "return_obligation": s.return_obligation,
+        "entry_requirement": s.entry_requirement,
     }
+
+
+def _domain_of(url: str | None) -> str | None:
+    """Fallback logo domain, derived from the application URL."""
+    m = re.match(r"https?://([^/:?#]+)", url or "")
+    return m.group(1).lower().removeprefix("www.") if m else None
 
 
 async def _coarse_candidates(db: AsyncSession, profile: dict) -> list[dict]:

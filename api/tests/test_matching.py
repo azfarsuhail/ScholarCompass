@@ -201,3 +201,58 @@ def test_unknown_subject_stays_untagged():
 def test_tagging_never_runs_away():
     many = catalogue.infer_fields("engineering computer medicine law physics economics art")
     assert len(many) <= 4
+
+
+# --- flagship-programme gates ---------------------------------------------
+# Chevening publishes 2,800 hours and rejects applications without them, so
+# this is a real filter rather than a preference.
+
+CHEVENING = BASE | {
+    "slug": "chevening", "min_work_experience_hours": 2800,
+    "return_obligation": "You must return to your home country for two years.",
+}
+
+
+def test_meeting_the_work_hours_requirement_is_exact():
+    student = STUDENT | {"work_experience_hours": 3000}
+    assert levels(relax(student, [CHEVENING], today=TODAY)[0]) == ["R0"]
+
+
+def test_unstated_work_hours_does_not_exclude():
+    """Unknown is not the same as zero — the student simply did not say."""
+    assert levels(relax(STUDENT, [CHEVENING], today=TODAY)[0]) == ["R0"]
+
+
+def test_near_miss_on_work_hours_surfaces_at_r3():
+    """2,400 of 2,800 is within the 20% accrual margin."""
+    student = STUDENT | {"work_experience_hours": 2400}
+    got, _, _ = relax(student, [CHEVENING], today=TODAY)
+    assert levels(got) == ["R3"]
+    assert any("2,800" in g for g in got[0].gaps)
+
+
+def test_no_work_experience_is_never_shown():
+    """Showing this to a fresh graduate costs them a real application fee."""
+    student = STUDENT | {"work_experience_hours": 0}
+    assert relax(student, [CHEVENING], today=TODAY)[0] == []
+
+    far_off = STUDENT | {"work_experience_hours": 500}
+    assert relax(far_off, [CHEVENING], today=TODAY)[0] == []
+
+
+def test_return_obligation_is_shown_but_never_filters():
+    """It binds a student for years; it must not be discovered after acceptance."""
+    student = STUDENT | {"work_experience_hours": 3000}
+    got, _, _ = relax(student, [CHEVENING], today=TODAY)
+    assert got[0].level == "R0", "a return obligation must not affect eligibility"
+    assert any("two years" in n.lower() for n in got[0].notes)
+
+
+def test_grounding_rejects_figures_absent_from_the_page():
+    """The real failure: 5,400 hours invented from a page containing no number."""
+    from app.ingest.run import _grounded
+
+    assert _grounded(5400, "Chevening requires work experience. Apply now.") is None
+    assert _grounded(30, "no age limit appears here") is None
+    assert _grounded(2800, "You need 2,800 hours of work experience") == 2800
+    assert _grounded(2800, "requires 2800 hours") == 2800

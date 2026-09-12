@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
+import { ProviderLogo } from "@/components/ProviderLogo";
 import { LEVEL_LABEL, type Enrichment, type MatchEvent } from "@/lib/types";
 
 const TONE_CLASS: Record<string, string> = {
@@ -54,8 +55,13 @@ export function MatchCard({
       whileHover={reduced ? undefined : { y: -2 }}
       className="group relative rounded-sc border border-border bg-card p-4 transition-colors duration-200 focus-within:border-accent hover:border-accent"
     >
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="font-bold text-card-foreground">
+      <div className="flex items-start gap-3">
+        <ProviderLogo
+          domain={s.provider_domain}
+          name={s.provider ?? s.title}
+          size={40}
+        />
+        <h3 className="min-w-0 flex-1 font-bold text-card-foreground">
           {/*
             The handoff. The whole card is the click target via ::after, so
             there is one unambiguous action per result and no intermediate

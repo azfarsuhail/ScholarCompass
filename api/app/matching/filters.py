@@ -8,7 +8,8 @@ The ladder
 R0  exact      every stated constraint holds
 R1  funding    accept partial/tuition when the student wanted full funding
 R2  language   waive the language minimum (a test is retakeable in weeks)
-R3  gpa        allow a 0.3 shortfall ("normally 3.0" is usually soft)
+R3  gpa        allow a 0.3 shortfall ("normally 3.0" is usually soft), and a
+               20% shortfall in required work experience hours
 R4  deadline   include deadlines closed within the last year, for next cycle
 R5  field      drop the field-of-study match — broad discovery
 
@@ -38,6 +39,9 @@ from datetime import date, timedelta
 LEVELS = ("R0", "R1", "R2", "R3", "R4", "R5")
 
 GPA_SLACK = 0.3
+# Work-experience shortfall forgiven at R3. Proportional, not absolute: 20% of
+# Chevening's 2,800 is ~560 hours, which is a realistic few months of accrual.
+WORK_HOURS_SLACK = 0.20
 # How far back R4 looks for calls expected to reopen.
 REOPEN_WINDOW = timedelta(days=365)
 # Applied when the GPA came from OCR rather than the student's own typing.
@@ -128,6 +132,21 @@ def _gpa_ok(s: dict, profile: dict, slack: float) -> bool:
     return float(gpa) >= float(minimum) - slack
 
 
+def _work_hours_ok(s: dict, profile: dict, slack_fraction: float = 0.0) -> bool:
+    """Chevening-style work-experience gates.
+
+    Unknown hours pass, consistent with every other unstated value here: a
+    student who has not told us cannot be rejected on it.
+    """
+    required = s.get("min_work_experience_hours")
+    if not required:
+        return True
+    have = profile.get("work_experience_hours")
+    if have is None:
+        return True
+    return float(have) >= float(required) * (1 - slack_fraction)
+
+
 def _age_ok(s: dict, profile: dict) -> bool:
     cap, age = s.get("max_age"), profile.get("age")
     if cap is None or age is None:
@@ -157,6 +176,15 @@ def _passes(s: dict, profile: dict, level: str, today: date) -> tuple[bool, list
     tol = _gpa_tolerance(profile)
     if tol:
         notes.append("Based on a GPA we read from your transcript — please confirm it.")
+
+    # Never a filter, always surfaced. Chevening's two-year return rule and
+    # Fulbright's home-residency requirement do not make anyone ineligible,
+    # but they bind a student for years afterwards and must not be discovered
+    # after acceptance.
+    if s.get("return_obligation"):
+        notes.append(str(s["return_obligation"]))
+    if s.get("entry_requirement"):
+        notes.append(str(s["entry_requirement"]))
 
     # --- deadline: only R4+ may include closed calls ---
     if not _deadline_open(s, today):
@@ -189,6 +217,21 @@ def _passes(s: dict, profile: dict, level: str, today: date) -> tuple[bool, list
         gaps.append(
             f"Asks for {s.get('min_gpa_4')} GPA; you are slightly under. "
             "Stated minima are often soft — worth asking."
+        )
+
+    # --- work experience: R3+ forgives a near miss, nothing forgives a gulf ---
+    if not _work_hours_ok(s, profile):
+        if rung < LEVELS.index("R3"):
+            return False, [], []
+        # Within 20% is a plausible "by the deadline" case (Chevening counts
+        # hours accrued up to the closing date). Below that the application
+        # would simply be rejected, and showing it costs a real fee.
+        if not _work_hours_ok(s, profile, slack_fraction=WORK_HOURS_SLACK):
+            return False, [], []
+        have = profile.get("work_experience_hours")
+        gaps.append(
+            f"Needs {s['min_work_experience_hours']:,} hours of work experience; "
+            f"you listed {int(have):,}. Hours count up to the deadline."
         )
 
     # --- age is a hard cap wherever it is stated ---

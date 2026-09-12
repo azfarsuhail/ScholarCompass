@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { HeroReveal } from "@/components/HeroReveal";
 import { Reveal } from "@/components/Reveal";
+import { GeometricBackground } from "@/components/ui/GeometricBackground";
 import { retentionLabel } from "@/lib/retention";
 
 const PROOF = [
@@ -39,8 +40,10 @@ const STEPS = [
 export default function Home() {
   return (
     <main id="main" className="flex-1">
-      {/* Hero — canvas band. On this system the dark canvas IS the whitespace. */}
-      <section className="mx-auto w-full max-w-[1199px] px-lg py-section sm:px-xl">
+      {/* Hero — canvas band. On this system the dark canvas IS the whitespace.
+          `relative` establishes the containing block for the geometry layer. */}
+      <section className="relative mx-auto w-full max-w-[1199px] px-lg py-section sm:px-xl">
+        <GeometricBackground />
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -55,60 +58,69 @@ export default function Home() {
           <HeroReveal>Scholarships you can actually get.</HeroReveal>
         </h1>
 
-        <motion.p
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-          className="fr-body-lg mt-lg max-w-[52ch] text-ink-muted"
-        >
-          Most search tools show you everything, then let you discover you were
-          ineligible after the application fee. We check the rules first, then
-          send you straight to the official page.
-        </motion.p>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
-          className="mt-xl flex flex-wrap items-center gap-md"
-        >
-          {/* button-primary: the only primary CTA shape in the system. */}
-          <Link href="/start" className="fr-btn-primary">
-            Find my scholarships
-          </Link>
-          <span className="fr-body-sm text-ink-muted">
-            No sign-up. About two minutes.
-          </span>
-        </motion.div>
-
         {/*
-          product-mockup-tile: DESIGN.md > Shapes > "Embedded site mockups sit
-          in {rounded.xl} 20px tiles with {spacing.md} 15px interior padding",
-          on a surface-1 ground with the level-2 light-edge treatment.
-
-          A single-column poster hero is the documented shape, so the image
-          sits BELOW the headline rather than squeezing the 110px display type
-          into half a column.
+          Side-by-side band: lead copy + CTA on one side, the product mockup
+          directly beside it on desktop. Stacks to one column below lg.
+          gap-xl (30px) and mt-xl keep the 5px spacing rhythm.
+          items-center so the copy is optically centred against the taller
+          image rather than pinned to its top edge.
         */}
-        <Reveal immediate delay={0.35} className="mt-xxl block">
-          <div className="fr-elev-2 overflow-hidden rounded-xl bg-surface-1 p-md">
-            <Image
-              src="/images/hero-credentials.webp"
-              // Decorative: the headline and subhead already carry the meaning,
-              // so announcing this illustration would only repeat them.
-              alt=""
-              aria-hidden="true"
-              width={1600}
-              height={893}
-              // This is the LCP element. priority preloads it and skips the
-              // lazy-loading intersection wait; 66KB keeps it cheap to do so.
-              priority
-              fetchPriority="high"
-              sizes="(max-width: 1199px) 100vw, 1139px"
-              className="h-auto w-full rounded-md"
-            />
+        <div className="mt-xl grid grid-cols-1 items-center gap-xl lg:grid-cols-2">
+          <div>
+            <motion.p
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+              className="fr-body-lg max-w-[52ch] text-ink-muted"
+            >
+              Most search tools show you everything, then let you discover you
+              were ineligible after the application fee. We check the rules
+              first, then send you straight to the official page.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              className="mt-xl flex flex-wrap items-center gap-md"
+            >
+              {/* button-primary: the only primary CTA shape in the system. */}
+              <Link href="/start" className="fr-btn-primary">
+                Find my scholarships
+              </Link>
+              <span className="fr-body-sm text-ink-muted">
+                No sign-up. About two minutes.
+              </span>
+            </motion.div>
           </div>
-        </Reveal>
+
+          {/*
+            product-mockup-tile: DESIGN.md > Shapes > "Embedded site mockups sit
+            in {rounded.xl} 20px tiles with {spacing.md} 15px interior padding",
+            on a surface-1 ground with the level-2 light-edge treatment.
+          */}
+          <Reveal immediate delay={0.35} className="block">
+            <div className="fr-elev-2 overflow-hidden rounded-xl bg-surface-1 p-md">
+              <Image
+                src="/images/hero-credentials.webp"
+                // Decorative: the headline and subhead already carry the
+                // meaning, so announcing this illustration would repeat them.
+                alt=""
+                aria-hidden="true"
+                width={1600}
+                height={893}
+                // Still the LCP element. priority preloads it and skips the
+                // lazy-loading intersection wait; 66KB keeps that cheap.
+                priority
+                fetchPriority="high"
+                // Half-width at lg now, so the browser fetches a materially
+                // smaller candidate than the old full-bleed 1139px.
+                sizes="(max-width: 1023px) 100vw, 554px"
+                className="h-auto w-full rounded-md"
+              />
+            </div>
+          </Reveal>
+        </div>
 
         <Reveal immediate delay={0.5} stagger="[data-proof]" className="mt-xxl block">
           <dl className="grid grid-cols-1 gap-lg sm:grid-cols-3">

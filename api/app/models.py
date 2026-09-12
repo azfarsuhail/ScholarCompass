@@ -322,3 +322,44 @@ class VisaSourceChunk(Base):
         Index("ix_visa_chunk_fts", "search_vector", postgresql_using="gin"),
         Index("ix_visa_chunk_pair", "destination_iso3", "passport_iso3"),
     )
+
+
+class RetrievalCache(Base):
+    """Content-addressed cache for anything expensive and deterministic.
+
+    Two artifact types live here today:
+
+      * ``match_score`` -- one Groq fit judgement. The key is a hash of the
+        EXACT prompt (system + model + rendered user message), so the entry is
+        content-addressed: change the prompt, the model, the profile or the
+        scholarship and you get a different key rather than a stale answer.
+        Re-running the same search therefore costs zero Groq calls, which is
+        what keeps a demo (or a refresh-happy student) inside the quota.
+
+      * ``deterministic`` -- one whole R0-R5 result set. Saves the Neon
+        round-trip plus the ladder, which together are the entire latency
+        budget of the first paint.
+
+    Privacy: rows are NOT session-scoped, and that is a deliberate, bounded
+    choice. A `match_score` hit requires a byte-identical prompt, and the
+    prompt is built only from profile fields (never a name -- see
+    routers/match.PROFILE_FIELDS, which does not accept one). So the only
+    caller who can read an entry is one whose own profile already contains
+    everything the cached text was derived from. Session-scoping it would make
+    the cache almost never hit while protecting nothing extra.
+    """
+
+    __tablename__ = "retrieval_cache"
+
+    # sha256 hex of the artifact's inputs. Not a surrogate id -- the key IS
+    # the identity, which is what makes a stale read impossible by construction.
+    cache_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    artifact_type: Mapped[str] = mapped_column(String(24), index=True)
+
+    payload: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # Model + prompt version that produced it. Redundant with the key (both
+    # are hashed in) but readable, so a bad generation can be found and purged.
+    version: Mapped[str | None] = mapped_column(String(80))
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)

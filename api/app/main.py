@@ -6,12 +6,14 @@ from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from . import cache
 from .config import settings
 from .db import Base, SessionLocal, engine, get_db
-from .limits import MaxBodySizeMiddleware
+from .limits import MaxBodySizeMiddleware, limiter, rate_limit_handler
 from .models import AnonSession
 from .ocr import MAX_BYTES
 from .routers import documents, match, visa
@@ -34,6 +36,9 @@ async def _sweep_expired() -> None:
                         AnonSession.expires_at < datetime.now(timezone.utc)
                     )
                 )
+                # Expired cache rows go in the same pass. They hold no personal
+                # data, but an unbounded cache table is still a slow leak.
+                await cache.sweep(db)
                 await db.commit()
         except Exception:  # noqa: BLE001 - a failed sweep must never kill the app
             pass
@@ -63,6 +68,12 @@ app = FastAPI(
     description="Anonymous scholarship + visa discovery. No accounts, ever.",
     lifespan=lifespan,
 )
+
+# slowapi reads the limiter off app.state, and routes opt in with a decorator
+# (see routers/match.py) rather than a blanket middleware -- the deterministic
+# and visa reads are cheap and should not share a budget with Groq fan-out.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
 # Order matters. Middleware added LAST runs OUTERMOST, so the body-size guard
 # must be added after the session middleware: it has to reject an oversized

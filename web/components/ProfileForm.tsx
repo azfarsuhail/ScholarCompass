@@ -118,6 +118,9 @@ export function ProfileForm() {
               }
             : {}),
           ...(parsed.age !== undefined ? { age: parsed.age } : {}),
+          ...(parsed.work_experience_hours !== undefined
+            ? { work_experience_hours: parsed.work_experience_hours }
+            : {}),
           ...(parsed.ielts !== undefined
             ? { language_scores: { ielts: parsed.ielts } }
             : {}),
@@ -371,6 +374,24 @@ export function ProfileForm() {
                         <FormDescription>Some awards have an age cap</FormDescription>
                         <FormControl>
                           <Input {...field} value={field.value ?? ""} type="number" inputMode="numeric" className={CONTROL} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="work_experience_hours"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Work experience (hours)</FormLabel>
+                        <FormDescription>
+                          Chevening and similar awards require a minimum — blank means we
+                          won’t filter on it
+                        </FormDescription>
+                        <FormControl>
+                          <Input {...field} value={field.value ?? ""} type="number" min="0" step="100" inputMode="numeric" className={CONTROL} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

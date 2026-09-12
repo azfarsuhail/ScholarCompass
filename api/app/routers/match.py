@@ -28,9 +28,12 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
 
+from .. import cache
+from ..config import settings
 from ..db import SessionLocal, get_db
-from ..matching.filters import relax
-from ..matching.scoring import score_stream
+from ..limits import MATCH_STREAM_LIMIT, limiter
+from ..matching.filters import Candidate, relax
+from ..matching.scoring import prompt_key, score_stream
 from ..models import AnonSession, MatchExplanation, MatchRun, Scholarship
 from ..session import current_session
 
@@ -58,7 +61,14 @@ def _row_to_dict(s: Scholarship) -> dict:
         "max_age": s.max_age, "funding_type": s.funding_type,
         "deadline": s.deadline, "is_rolling": s.is_rolling,
         "source_url": s.source_url,
-        "last_verified_at": s.last_verified_at,
+        # ISO-8601 explicitly, not left to str(datetime): that renders
+        # "2026-09-13 10:00:00+00:00" with a SPACE, which Safari refuses to
+        # parse in `new Date(...)`. The freshness badge would read "Invalid
+        # Date" for a slice of users and nowhere else would notice.
+        #
+        # `deadline` deliberately stays a real date object -- filters.py
+        # compares it -- and is stringified at the JSON boundary instead.
+        "last_verified_at": s.last_verified_at.isoformat() if s.last_verified_at else None,
         # Lets the UI distinguish "the publisher announces this later" from
         # "we could not find a deadline". See ingest/catalogue.py.
         "deadline_note": (s.raw or {}).get("deadline_note"),
@@ -108,6 +118,90 @@ async def _coarse_candidates(db: AsyncSession, profile: dict) -> list[dict]:
     return [_row_to_dict(r) for r in rows]
 
 
+# Everything the client is allowed to write into the session profile.
+#
+# This set is a real filter boundary, not bookkeeping: a key missing from here
+# is accepted by the form, sent over the wire, and then silently dropped -- so
+# any matcher input that depends on it can never fire in production. Keep it
+# in step with matching/filters.py and web/lib/schema.ts.
+PROFILE_FIELDS = frozenset({
+    "degree_level", "fields_of_study", "gpa_4", "gpa_source", "gpa_confidence",
+    "passport_iso3", "age", "funding_preference", "language_scores",
+    "target_countries", "institution", "skills", "experience",
+    # Chevening-style awards reject outright below a stated hours figure, so
+    # this is a filter input rather than a preference.
+    "work_experience_hours",
+})
+
+
+def merge_profile(profile: dict, payload: dict) -> dict:
+    """Fold an untrusted payload into a session profile.
+
+    Pure, so the boundary that decides which student facts survive can be
+    tested without a database -- the same reason filters.py is a pure function.
+    """
+    profile = dict(profile)
+    profile.update({k: v for k, v in payload.items() if k in PROFILE_FIELDS})
+
+    # Free text from an untrusted client, landing in a JSONB column. Capped
+    # here rather than trusted to respect the form's own limits -- the form is
+    # not the only thing that can call this endpoint.
+    if "skills" in profile:
+        raw = profile["skills"]
+        profile["skills"] = (
+            [str(s)[:60] for s in raw][:30] if isinstance(raw, list) else []
+        )
+    if "experience" in profile:
+        raw = profile["experience"]
+        profile["experience"] = (
+            [
+                {
+                    "role": str(e.get("role") or "")[:120],
+                    "organisation": str(e.get("organisation") or "")[:120],
+                    "period": str(e["period"])[:60] if e.get("period") else None,
+                }
+                for e in raw
+                if isinstance(e, dict)
+            ][:10]
+            if isinstance(raw, list)
+            else []
+        )
+    if isinstance(profile.get("institution"), str):
+        profile["institution"] = profile["institution"][:160]
+
+    # A GPA the student typed outranks one we guessed from a scan.
+    if "gpa_4" in payload and "gpa_source" not in payload:
+        profile["gpa_source"] = "user"
+        profile.pop("gpa_confidence", None)
+
+    return profile
+
+
+def _profile_fingerprint(profile: dict) -> str:
+    """Canonical form of a profile, for addressing a cached result set.
+
+    Sorted keys so that two identical profiles built in a different order hash
+    the same; `default=str` so a stray date cannot make the fingerprint throw.
+    """
+    return json.dumps(profile, sort_keys=True, default=str)
+
+
+def _explanation(run_id, candidate, index: int, scored: dict, *, cached: bool):
+    """One MatchExplanation row. Cached and fresh scores are stored alike so a
+    run stays fully explainable regardless of where its scores came from."""
+    return MatchExplanation(
+        run_id=run_id,
+        scholarship_id=candidate.scholarship["id"],
+        entered_at_level=candidate.level,
+        deterministic_rank=index,
+        semantic_score=scored.get("score"),
+        rationale=scored.get("rationale"),
+        matched_criteria=scored.get("matched_criteria") or [],
+        gaps=scored.get("gaps") or [],
+        model="groq (cached)" if cached else "groq",
+    )
+
+
 @router.put("/profile")
 async def update_profile(
     payload: dict,
@@ -115,18 +209,7 @@ async def update_profile(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Merge fields into the session profile. Progressive by design."""
-    profile = dict(session.profile or {})
-    allowed = {
-        "degree_level", "fields_of_study", "gpa_4", "gpa_source", "gpa_confidence",
-        "passport_iso3", "age", "funding_preference", "language_scores",
-        "target_countries",
-    }
-    profile.update({k: v for k, v in payload.items() if k in allowed})
-
-    # A GPA the student typed outranks one we guessed from a scan.
-    if "gpa_4" in payload and "gpa_source" not in payload:
-        profile["gpa_source"] = "user"
-        profile.pop("gpa_confidence", None)
+    profile = merge_profile(dict(session.profile or {}), payload)
 
     session.profile = profile
     if isinstance(profile.get("passport_iso3"), str):
@@ -136,18 +219,70 @@ async def update_profile(
 
 
 @router.get("/match/stream")
+@limiter.limit(MATCH_STREAM_LIMIT)
 async def match_stream(
+    # slowapi resolves its bucket from this parameter by NAME -- rename it and
+    # the limit silently stops applying rather than failing loudly.
     request: Request,
     session: AnonSession = Depends(current_session),
     db: AsyncSession = Depends(get_db),
 ) -> StreamingResponse:
     profile = dict(session.profile or {})
     session_id = session.id
+    cfg = settings()
 
     t0 = time.perf_counter()
-    rows = await _coarse_candidates(db, profile)
-    candidates, counts, deepest = relax(profile, rows, today=date.today())
+
+    # --- deterministic half ------------------------------------------------
+    # A repeat of the same profile skips both the Neon round-trip and the
+    # ladder, which together are the whole first-paint budget.
+    det_key = cache.key_for(
+        "deterministic", cfg.min_results_before_relaxing, _profile_fingerprint(profile)
+    )
+    cached = await cache.get(db, det_key)
+    if cached:
+        # Rebuilt, not re-relaxed. The scholarship dicts in here have had their
+        # dates flattened to strings by JSONB, so they must not go back through
+        # filters.py -- see cache.jsonable.
+        candidates = [
+            Candidate(
+                scholarship=c["scholarship"],
+                level=c["level"],
+                gaps=list(c.get("gaps") or []),
+                notes=list(c.get("notes") or []),
+            )
+            for c in (cached.get("candidates") or [])
+        ]
+        counts = cached.get("counts") or {}
+        deepest = cached.get("deepest") or "R0"
+        corpus_size = cached.get("corpus_size")
+    else:
+        rows = await _coarse_candidates(db, profile)
+        corpus_size = len(rows)
+        candidates, counts, deepest = relax(
+            profile,
+            rows,
+            min_results=cfg.min_results_before_relaxing,
+            today=date.today(),
+        )
+
     deterministic_ms = int((time.perf_counter() - t0) * 1000)
+    if deterministic_ms > cfg.deterministic_budget_ms:
+        # The deterministic half is the one latency promise this product makes.
+        # Recording it on MatchRun proves it after the fact; logging it here is
+        # what makes a regression visible without querying the table.
+        log.warning(
+            "deterministic pass took %dms over a %dms budget (%s candidates scanned)",
+            deterministic_ms,
+            cfg.deterministic_budget_ms,
+            corpus_size if corpus_size is not None else "cached",
+        )
+
+    # --- which fit judgements do we already own? ---------------------------
+    # ONE query for all of them. Forty individual lookups against a
+    # network-attached database would cost more than the Groq calls they save.
+    score_keys = [prompt_key(profile, c) for c in candidates]
+    score_hits = await cache.get_many(db, score_keys)
 
     run = MatchRun(
         session_id=session_id, status="running", relaxation_level=deepest,
@@ -166,6 +301,12 @@ async def match_stream(
             "level_counts": counts,
             "candidate_count": len(candidates),
             "deterministic_ms": deterministic_ms,
+            # Surfaced rather than hidden: a judge (or a student wondering why
+            # the second search was instant) can see exactly what was reused.
+            "cache": {
+                "deterministic_hit": cached is not None,
+                "scores_cached": len(score_hits),
+            },
         })
 
         for i, c in enumerate(candidates):
@@ -181,27 +322,67 @@ async def match_stream(
         # Deterministic half is on screen. Everything below is additive.
         enriched = 0
         t1 = time.perf_counter()
+
+        # Store the ladder's output now rather than before the first byte, so a
+        # cache MISS pays nothing on the latency path it exists to protect.
+        if cached is None:
+            async with SessionLocal() as w:
+                try:
+                    await w.execute(cache.put_stmt(
+                        det_key, "deterministic",
+                        {
+                            "candidates": [
+                                {"scholarship": c.scholarship, "level": c.level,
+                                 "gaps": c.gaps, "notes": c.notes}
+                                for c in candidates
+                            ],
+                            "counts": counts, "deepest": deepest,
+                            "corpus_size": corpus_size,
+                        },
+                        cache.DETERMINISTIC_TTL,
+                    ))
+                    await w.commit()
+                except Exception as e:  # noqa: BLE001 - a cache is never load-bearing
+                    log.warning("deterministic cache write failed: %s", e)
+
+        # Cached scores cost nothing, so they go out before a single Groq call.
+        if score_hits:
+            async with SessionLocal() as w:
+                for i, key in enumerate(score_keys):
+                    scored = score_hits.get(key)
+                    if scored is None:
+                        continue
+                    enriched += 1
+                    yield _sse("enrichment", {"index": i, "cached": True, **scored})
+                    w.add(_explanation(run_id, candidates[i], i, scored, cached=True))
+                try:
+                    await w.commit()
+                except Exception as e:  # noqa: BLE001
+                    log.warning("persisting cached explanations failed: %s", e)
+
+        # Only the misses reach the model.
+        misses = [(i, c) for i, c in enumerate(candidates) if score_keys[i] not in score_hits]
         try:
-            async for i, scored in score_stream(profile, candidates):
+            async for i, scored in score_stream(
+                profile,
+                [c for _, c in misses],
+                indices=[i for i, _ in misses],
+            ):
                 if await request.is_disconnected():
                     break
                 if scored is None:
                     continue
                 enriched += 1
-                yield _sse("enrichment", {"index": i, **scored})
+                yield _sse("enrichment", {"index": i, "cached": False, **scored})
                 # A fresh session per write: the request-scoped one may be
-                # mid-teardown by the time late enrichments land.
+                # mid-teardown by the time late enrichments land. The cache
+                # entry rides along in the same transaction, so remembering
+                # this answer costs no extra round-trip.
                 async with SessionLocal() as w:
-                    w.add(MatchExplanation(
-                        run_id=run_id,
-                        scholarship_id=candidates[i].scholarship["id"],
-                        entered_at_level=candidates[i].level,
-                        deterministic_rank=i,
-                        semantic_score=scored["score"],
-                        rationale=scored["rationale"],
-                        matched_criteria=scored["matched_criteria"],
-                        gaps=scored["gaps"],
-                        model="groq",
+                    w.add(_explanation(run_id, candidates[i], i, scored, cached=False))
+                    await w.execute(cache.put_stmt(
+                        score_keys[i], "match_score", scored,
+                        cache.MATCH_SCORE_TTL, version=cfg.match_model,
                     ))
                     await w.commit()
         except asyncio.CancelledError:
@@ -217,7 +398,11 @@ async def match_stream(
                 r.completed_at = datetime.now(timezone.utc)
                 await w.commit()
 
-        yield _sse("done", {"enriched": enriched, "total": len(candidates)})
+        yield _sse("done", {
+            "enriched": enriched,
+            "total": len(candidates),
+            "from_cache": len(score_hits),
+        })
 
     return StreamingResponse(
         stream(),

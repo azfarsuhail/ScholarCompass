@@ -7,10 +7,11 @@ wins and the narrative is shown as supporting detail, never as a correction.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
+from ..limits import VISA_CHECK_LIMIT, limiter
 from ..models import AnonSession
 from ..orizn import REQUIREMENT_LABELS, get_or_fetch
 from ..rag.pipeline import enrich_evidence
@@ -21,7 +22,12 @@ router = APIRouter(prefix="/v1/visa", tags=["visa"])
 
 
 @router.get("/check")
+@limiter.limit(VISA_CHECK_LIMIT)
 async def check(
+    # Required by slowapi, which resolves the bucket from this parameter by
+    # NAME. Rename it and the limit silently stops applying. It has no default,
+    # so it must also stay ahead of every Query/Depends argument.
+    request: Request,
     destination: str = Query(..., min_length=3, max_length=3),
     passport: str | None = Query(None, min_length=3, max_length=3),
     explain: bool = Query(False, description="Also run the RAG narrative"),

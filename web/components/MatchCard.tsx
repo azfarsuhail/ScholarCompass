@@ -1,9 +1,12 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { Star } from "lucide-react";
 
 import { ProviderLogo } from "@/components/ProviderLogo";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { VisaReadiness } from "@/components/VisaReadiness";
+import { useFavorites } from "@/lib/favorites";
 import { LEVEL_LABEL, type Enrichment, type MatchEvent } from "@/lib/types";
 
 /**
@@ -58,6 +61,8 @@ export function MatchCard({
   const reduced = useReducedMotion();
   const { label, tone } = LEVEL_LABEL[match.level];
   const s = match.scholarship;
+  const { has, toggle, isFull } = useFavorites();
+  const saved = has(s.id);
 
   return (
     <motion.li
@@ -105,12 +110,45 @@ export function MatchCard({
         >
           {label}
         </span>
+
+        {/*
+          `relative z-10` is load-bearing: the title link above spreads an
+          ::after over the whole card, so without it every click on this button
+          would be swallowed by the link and open the application page instead.
+
+          44px square per DESIGN.md > Responsive > Touch Targets, which takes
+          precedence over the 32-40px documented for icon circles.
+        */}
+        <button
+          type="button"
+          onClick={() => toggle(s)}
+          disabled={!saved && isFull}
+          aria-pressed={saved}
+          aria-label={saved ? `Remove ${s.title} from saved` : `Save ${s.title} to compare`}
+          title={
+            !saved && isFull
+              ? "Your shortlist is full — remove one to save another"
+              : saved
+                ? "Saved. Click to remove."
+                : "Save to compare"
+          }
+          className={`relative z-10 grid size-11 shrink-0 cursor-pointer place-items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-blue disabled:cursor-not-allowed disabled:opacity-40 ${
+            saved ? "bg-surface-2 text-ink" : "text-ink-muted hover:bg-surface-2 hover:text-ink"
+          }`}
+        >
+          <Star aria-hidden="true" className="size-5" fill={saved ? "currentColor" : "none"} />
+        </button>
       </div>
 
-      <p className="fr-body-sm mt-sm text-ink-muted">
-        {[s.provider, s.host_country_iso3].filter(Boolean).join(" · ")}
-        {" · "}
-        {formatDeadline(match)}
+      <p className="fr-body-sm mt-sm flex flex-wrap items-center gap-x-xs gap-y-xxs text-ink-muted">
+        <span>
+          {[s.provider, s.host_country_iso3].filter(Boolean).join(" · ")}
+          {" · "}
+          {formatDeadline(match)}
+        </span>
+        {/* Provenance sits with the other meta, not as a decoration: it is the
+            claim the rest of the card depends on. */}
+        <VerifiedBadge at={s.last_verified_at} />
       </p>
 
       {match.notes.map((n) => (

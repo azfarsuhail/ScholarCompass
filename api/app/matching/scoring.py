@@ -15,6 +15,8 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from ..cache import key_for
+from ..config import settings
 from ..llm import complete_json
 
 log = logging.getLogger(__name__)
@@ -45,10 +47,21 @@ def _profile_brief(profile: dict) -> str:
         ("gpa_4", "GPA (4.0 scale)"), ("passport_iso3", "Passport"),
         ("age", "Age"), ("funding_preference", "Wants"),
         ("language_scores", "Language"), ("target_countries", "Prefers"),
+        ("institution", "Studied at"), ("skills", "Skills"),
+        ("work_experience_hours", "Work experience (hours)"),
     ):
         v = profile.get(key)
         if v:
             bits.append(f"{label}: {v}")
+    # Roles spelled out rather than dumped as a dict repr -- fit is the one
+    # thing the model IS here to judge, and this is the evidence for it.
+    for e in (profile.get("experience") or [])[:5]:
+        if isinstance(e, dict) and (e.get("role") or e.get("organisation")):
+            period = f" ({e['period']})" if e.get("period") else ""
+            bits.append(
+                f"Experience: {e.get('role') or 'unspecified role'} at "
+                f"{e.get('organisation') or 'unspecified organisation'}{period}"
+            )
     if profile.get("gpa_source") == "ocr":
         bits.append("(GPA was read from a transcript scan and may be imprecise)")
     return "\n".join(bits) or "No profile details provided."
@@ -64,14 +77,31 @@ def _scholarship_brief(s: dict) -> str:
     )
 
 
-async def score_one(profile: dict, candidate) -> dict | None:
-    """Score a single candidate. None if the LLM is unavailable or too slow."""
+def _user_message(profile: dict, candidate) -> str:
+    """The exact user turn sent to the model. Also the thing we cache on."""
     gaps = "\n".join(f"- {g}" for g in candidate.gaps)
-    user = (
+    return (
         f"STUDENT\n{_profile_brief(profile)}\n\n"
         f"SCHOLARSHIP\n{_scholarship_brief(candidate.scholarship)}\n\n"
         f"KNOWN GAPS (already established, do not re-derive)\n{gaps or '- none'}"
     )
+
+
+def prompt_key(profile: dict, candidate) -> str:
+    """Cache key for one fit judgement.
+
+    Hashes the WHOLE prompt, system text and model name included, so editing
+    SYSTEM or switching models invalidates every stored score without anyone
+    having to remember to bump a version constant. Built from the same
+    `_user_message` the request itself uses, so the key cannot drift from what
+    was actually asked.
+    """
+    return key_for("match_score", settings().match_model, SYSTEM, _user_message(profile, candidate))
+
+
+async def score_one(profile: dict, candidate) -> dict | None:
+    """Score a single candidate. None if the LLM is unavailable or too slow."""
+    user = _user_message(profile, candidate)
     try:
         data = await asyncio.wait_for(
             # 400 tokens is enough for the answer but not for a reasoning
@@ -97,19 +127,25 @@ async def score_one(profile: dict, candidate) -> dict | None:
     }
 
 
-async def score_stream(profile: dict, candidates: list):
+async def score_stream(profile: dict, candidates: list, *, indices: list[int] | None = None):
     """Yield (index, scored) as each candidate finishes, not in input order.
 
     Streaming completion-order rather than input-order is what lets the UI
     animate each enrichment in as it lands, instead of stalling on the slowest.
+
+    `indices` maps positions in `candidates` back to their position in the
+    student's full result list. The caller passes it when it has already served
+    some candidates from cache and is only asking the model about the misses --
+    without it, the misses would be renumbered and land on the wrong cards.
     """
+    idx = indices if indices is not None else list(range(len(candidates)))
     sem = asyncio.Semaphore(MAX_CONCURRENCY)
 
     async def run(i: int, cand):
         async with sem:
             return i, await score_one(profile, cand)
 
-    tasks = [asyncio.create_task(run(i, c)) for i, c in enumerate(candidates)]
+    tasks = [asyncio.create_task(run(idx[i], c)) for i, c in enumerate(candidates)]
     try:
         for coro in asyncio.as_completed(tasks):
             yield await coro

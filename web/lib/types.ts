@@ -18,6 +18,9 @@ export type Scholarship = {
   deadline_note?: string | null;
   /** Bare domain for the Brandfetch logo hotlink (never an image URL). */
   provider_domain?: string | null;
+  /** ISO-8601. When we last re-checked this listing against its source —
+   *  null means never. Drives the freshness badge (PRD §5.2). */
+  last_verified_at?: string | null;
   min_work_experience_hours?: number | null;
   return_obligation?: string | null;
   entry_requirement?: string | null;
@@ -38,6 +41,10 @@ export type Enrichment = {
   rationale: string;
   matched_criteria: string[];
   gaps: string[];
+  /** True when this judgement was replayed from the server cache rather than
+   *  generated. Same content either way — surfaced so a repeat search that
+   *  lands instantly is explainable rather than suspicious. */
+  cached?: boolean;
 };
 
 export type RunEvent = {
@@ -46,6 +53,11 @@ export type RunEvent = {
   level_counts: Record<string, number>;
   candidate_count: number;
   deterministic_ms: number;
+  /** What this run reused instead of recomputing. */
+  cache?: {
+    deterministic_hit: boolean;
+    scores_cached: number;
+  };
 };
 
 /**

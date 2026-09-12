@@ -80,6 +80,11 @@ export const ProfileSchema = z.object({
   graduation_year: optionalNumber(1950, 2100, "Enter a four-digit year"),
   age: optionalNumber(15, 80, "Enter an age between 15 and 80"),
 
+  // Chevening asks for 2,800 hours and rejects below it, so this is one of the
+  // few numbers here that can actually exclude a scholarship. Blank still
+  // means "not stated", which the matcher treats as eligible rather than zero.
+  work_experience_hours: optionalNumber(0, 100000, "Enter hours between 0 and 100,000"),
+
   ielts: optionalNumber(0, 9, "IELTS is scored 0–9"),
 
   funding_preference: z.enum(["full", "any"]).default("any"),
@@ -145,6 +150,7 @@ export const emptyProfile: ProfileValues = {
   gpa_source: "user",
   graduation_year: "",
   age: "",
+  work_experience_hours: "",
   ielts: "",
   funding_preference: "full",
   skills: [],

@@ -13,6 +13,9 @@ alembic>=1.14
 httpx>=0.28
 python-multipart>=0.0.20
 itsdangerous>=2.2
+# Anonymous abuse control. Pure python, ~800KB with its `limits` dep, and the
+# default storage is an in-process dict -- no Redis to fit in the container.
+slowapi>=0.1.9
 
 # --- OCR: tesseract binary + thin wrappers. No torch. ---
 pytesseract>=0.3.13

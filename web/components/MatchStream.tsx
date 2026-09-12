@@ -3,9 +3,11 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { ComparePanel } from "@/components/ComparePanel";
 import { MatchCard } from "@/components/MatchCard";
 import { MatchListSkeleton } from "@/components/Skeleton";
 import { API_BASE } from "@/lib/api";
+import { useFavorites } from "@/lib/favorites";
 import type { Enrichment, MatchEvent, RunEvent } from "@/lib/types";
 
 type Status = "idle" | "streaming" | "done" | "error";
@@ -15,6 +17,8 @@ export function MatchStream({ autoStart = false }: { autoStart?: boolean }) {
   const [matches, setMatches] = useState<MatchEvent[]>([]);
   const [enrichments, setEnrichments] = useState<Record<number, Enrichment>>({});
   const [status, setStatus] = useState<Status>("idle");
+  const [compareOpen, setCompareOpen] = useState(false);
+  const { count: savedCount } = useFavorites();
   const sourceRef = useRef<EventSource | null>(null);
 
   const start = useCallback(() => {
@@ -101,13 +105,25 @@ export function MatchStream({ autoStart = false }: { autoStart?: boolean }) {
             </motion.p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={start}
-          className="fr-btn-secondary"
-        >
-          Search again
-        </button>
+        <div className="flex flex-wrap items-center gap-sm">
+          {savedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setCompareOpen(true)}
+              className="fr-btn-secondary"
+            >
+              Compare
+              {/* Surface lift for the count, not a chromatic fill — sky blue
+                  stays reserved for links, focus and selection. */}
+              <span className="fr-caption rounded-pill bg-surface-2 px-xs py-xxs text-ink">
+                {savedCount}
+              </span>
+            </button>
+          )}
+          <button type="button" onClick={start} className="fr-btn-secondary">
+            Search again
+          </button>
+        </div>
       </div>
 
       {/* Announced once, politely — not one announcement per arriving card. */}
@@ -135,8 +151,14 @@ export function MatchStream({ autoStart = false }: { autoStart?: boolean }) {
           role="alert"
           className="fr-body-sm mt-md rounded-md border border-destructive p-md text-destructive"
         >
-          The search stopped unexpectedly. Your answers are still saved — press
-          “Search again”.
+          {/*
+            EventSource exposes no status code to onerror, so a 429 from the
+            rate limiter and a dropped connection are indistinguishable here.
+            Rather than guess, the copy covers both and the remedy is the same.
+          */}
+          The search stopped. That is usually a dropped connection, or too many
+          searches in a short window — wait a moment, then press “Search again”.
+          Your answers are still saved.
         </p>
       )}
 
@@ -160,6 +182,8 @@ export function MatchStream({ autoStart = false }: { autoStart?: boolean }) {
           ))}
         </AnimatePresence>
       </motion.ul>
+
+      <ComparePanel open={compareOpen} onClose={() => setCompareOpen(false)} />
 
       {status === "done" && matches.length === 0 && (
         <p className="fr-body mt-lg rounded-xl bg-surface-1 p-lg text-ink-muted">

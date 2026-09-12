@@ -256,3 +256,58 @@ def test_grounding_rejects_figures_absent_from_the_page():
     assert _grounded(30, "no age limit appears here") is None
     assert _grounded(2800, "You need 2,800 hours of work experience") == 2800
     assert _grounded(2800, "requires 2800 hours") == 2800
+
+
+# --- the profile write boundary -----------------------------------------
+#
+# Regression cover for a real bug: the form sent skills/experience and the
+# matcher read work_experience_hours, but none of them were on the allow-list,
+# so they were dropped between the browser and the matcher. Every key the
+# matcher or the scorer reads must survive this function.
+
+from app.matching.filters import _work_hours_ok  # noqa: E402
+from app.routers.match import merge_profile  # noqa: E402
+
+
+def test_matcher_inputs_survive_the_profile_write():
+    """Any key a filter reads must be writable, or that filter is unreachable."""
+    got = merge_profile({}, {
+        "work_experience_hours": 3000,
+        "skills": ["python"],
+        "experience": [{"role": "Engineer", "organisation": "Acme", "period": "2y"}],
+        "institution": "NUST",
+    })
+    assert got["work_experience_hours"] == 3000
+    assert got["skills"] == ["python"]
+    assert got["experience"][0]["role"] == "Engineer"
+    assert got["institution"] == "NUST"
+
+    # The end the bug actually broke: the Chevening gate now sees a number.
+    assert _work_hours_ok(CHEVENING, got) is True
+    assert _work_hours_ok(CHEVENING, merge_profile({}, {"work_experience_hours": 100})) is False
+
+
+def test_unknown_keys_are_still_refused():
+    assert merge_profile({}, {"is_admin": True, "gpa_4": 3.5}) == {
+        "gpa_4": 3.5, "gpa_source": "user",
+    }
+
+
+def test_untrusted_lists_are_capped_and_never_crash():
+    got = merge_profile({}, {
+        "skills": ["x" * 500] * 200,
+        "experience": [{"role": "r"}] * 50,
+    })
+    assert len(got["skills"]) == 30 and len(got["skills"][0]) == 60
+    assert len(got["experience"]) == 10
+
+    # A client sending the wrong shape must not 500 the endpoint.
+    junk = merge_profile({}, {"skills": "python", "experience": {"role": "r"}})
+    assert junk == {"skills": [], "experience": []}
+
+
+def test_typed_gpa_overrides_a_scanned_one():
+    scanned = merge_profile({}, {"gpa_4": 2.9, "gpa_source": "ocr", "gpa_confidence": 0.4})
+    assert scanned["gpa_source"] == "ocr"
+    typed = merge_profile(scanned, {"gpa_4": 3.4})
+    assert typed["gpa_source"] == "user" and "gpa_confidence" not in typed

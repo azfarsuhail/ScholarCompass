@@ -463,10 +463,16 @@ cannot be expressed.
 ## Privacy
 
 No accounts. A signed `HttpOnly` cookie carries an opaque session UUID and
-nothing else. Uploads are OCR'd in memory and discarded — only the extracted
-grade is kept. A background sweeper hard-deletes expired sessions (and expired
-cache rows) every 15 minutes, and `DELETE /v1/session` erases everything
-immediately.
+nothing else.
+
+Stated precisely, because "nothing is kept" would be easier to say and would
+be false: the uploaded **file** is processed in memory and never written to
+disk or object storage, but the **text** Tesseract read out of it is stored on
+the session row (`documents.ocr_text`, capped at 20,000 characters) along with
+the normalised grade, the profile, and the match runs. All of it is anonymous,
+none of it is linked to a person, and all of it dies with the session — a
+background sweeper hard-deletes expired sessions and expired cache rows every
+15 minutes, and `DELETE /v1/session` erases everything immediately.
 
 The shortlist never leaves the browser. `POST /v1/matches/compare` is in the
 PRD; we deliberately did not build it. Comparing is a private act of

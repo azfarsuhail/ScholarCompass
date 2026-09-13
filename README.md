@@ -6,7 +6,7 @@ citation-bound RAG pipeline for visa requirements.
 
 ```
 web/   Next.js 16 · Tailwind v4 · Motion          → Vercel (fra1)
-api/   FastAPI · SQLAlchemy 2.0 · asyncpg         → SnapDeploy (512MB hard cap)
+api/   FastAPI · SQLAlchemy 2.0 · asyncpg         → Render (512MB hard cap)
 db     Neon PostgreSQL (serverless, pooled)
 jobs   Playwright crawlers                        → GitHub Actions (weekly)
 llm    Groq LPU inference                         → gpt-oss-20b / gpt-oss-120b
@@ -124,9 +124,16 @@ Local Postgres, 251-row corpus, live Groq, single container:
 
 Rate limiter, fresh IP: requests 1–5 → `200`, 6–7 → `429` + `Retry-After: 60`.
 
-> Against **Neon** in `ap-southeast-1` the cold deterministic pass measures
-> ~1.7 s — network-dominated, and the reason the deterministic cache exists.
-> The 304/89 ms figures above are local Postgres and are reported as such.
+Against the deployed stack (Vercel → Render → Neon) the same second search
+returns its deterministic half in **21 ms** with 31 of 40 scores replayed from
+cache. The first search after an idle period takes **4.5 s**.
+
+> Two caveats, because these numbers are only useful with their conditions
+> attached. The 304/89 ms figures above are **local Postgres**; against Neon the
+> network dominates and a cold deterministic pass measures ~1.7 s. And the 4.5 s
+> production cold figure is mostly not application work — Render's free tier
+> spins the container down when idle, so the first request pays a container
+> start too. That is what `web/components/KeepAlive.tsx` exists to prevent.
 
 82 tests, no database required for any of them.
 
@@ -161,7 +168,7 @@ graph TD
         RW["Rewrite /api/* → backend<br/>keeps session cookie first-party"]
     end
 
-    subgraph snap["SnapDeploy · 512MB hard cap"]
+    subgraph snap["Render · 512MB hard cap"]
         API["FastAPI · 1 uvicorn worker"]
         RL["slowapi<br/>in-process counters"]
         OCR["Tesseract OCR<br/>threadpool, in-memory"]

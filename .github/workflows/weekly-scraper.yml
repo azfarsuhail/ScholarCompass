@@ -1,7 +1,7 @@
 # Weekly scholarship refresh.
 #
 # The crawlers need Playwright + Chromium (~400MB) and several minutes of
-# wall-clock. The API runs in a 512MB SnapDeploy container and cannot host
+# wall-clock. The API runs in a 512MB Render container and cannot host
 # either, so the scrape happens here and writes straight to Neon. Nothing is
 # deployed by this workflow -- it only refreshes rows the API already serves.
 name: Weekly scraper

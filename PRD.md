@@ -302,6 +302,15 @@ Pointing the browser at another domain would mint a fresh empty session on every
 request. ☑️
 10.1.4 The rewrite target must tolerate a trailing slash. ✅
 
+10.1.5 **The API host spins the container down when idle.** A first request
+after a quiet period therefore pays a container start on top of the Neon
+round-trip — this is the dominant term in the cold figures in §10.2, not
+application work. A browser-side keep-alive pings an unauthenticated,
+unmetered endpoint every 10 minutes while a tab is open to hold the container
+awake. ⚠️ The ping requires `NEXT_PUBLIC_API_URL` to be present **at build
+time**; absent, it is inlined as `undefined`, resolves against the frontend
+origin and silently warms nothing (§14).
+
 ### 10.2 Latency
 
 | Stage | Target | Measured |
@@ -315,9 +324,11 @@ count. ✅
 10.2.2 Every run records its own deterministic and enrichment timings, so the
 contract is provable in production and not only in tests. ✅
 
-⚠️ The cold deterministic path has almost no headroom against the 5s target.
-Neon round-trip plus function cold start dominates; the cache is what makes the
-warm path fast.
+⚠️ The cold deterministic path has almost no headroom against the 5s target,
+and the gap between 4.5s and 21ms is almost entirely infrastructure: a
+spun-down container plus a Neon round-trip. The cache is what makes the warm
+path fast; the keep-alive (§10.1.5) is what keeps the path warm. Neither is
+optional if the p95 target is to hold in practice rather than on paper.
 
 ### 10.3 Cost control and caching
 
@@ -502,7 +513,13 @@ Ordered by what a reader of v1.2 will notice first.
 7. **Field-of-study taxonomy.** Inference is keyword matching; untagged
    programmes are not field-filtered and appear for everyone. Untagged is
    deliberately safer than mis-tagged, but a real taxonomy would beat it.
-8. **Multilingual OCR**, malware scanning, a document-status endpoint, and a
+8. **Keep-alive is inert in the current deployment.** `NEXT_PUBLIC_API_URL` is
+   not set in the production build, so the ping resolves against the frontend
+   origin and returns 404 while the API container sleeps as before. The
+   component now warns instead of firing a request it knows is wrong, but the
+   variable still has to be set **and the app rebuilt** — it is inlined at
+   build time, so setting it alone changes nothing (§10.1.5).
+9. **Multilingual OCR**, malware scanning, a document-status endpoint, and a
    `POST /v1/visa/refresh` route (refresh is a CLI worker today).
 
 ---

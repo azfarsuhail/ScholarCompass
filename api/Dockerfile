@@ -37,7 +37,7 @@ EXPOSE 8000
 #   * The workload is IO-bound (Neon, Groq, Orizn), so async concurrency inside
 #     one worker is what actually buys throughput here.
 #
-# Shell form so $PORT expands. Hosts that assign a port (SnapDeploy and most
+# Shell form so $PORT expands. Hosts that assign a port (Render and most
 # container PaaS) inject it as $PORT and route only to that port -- and the
 # exec form this replaced would have passed the literal string "$PORT" to
 # uvicorn, or silently kept listening on 8000 while the platform sent traffic

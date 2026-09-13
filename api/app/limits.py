@@ -105,11 +105,21 @@ def client_key(request: Request) -> str:
     every student on the planet in ONE shared 5-per-minute bucket -- the second
     visitor of the minute would be throttled because of the first.
 
-    The browser's own address is the first entry of X-Forwarded-For. Trusting
-    that header is safe only because the proxy is the sole ingress and the
-    container is not publicly routable; if it is ever exposed directly, this
-    has to become a trusted-hop count instead, since a client can otherwise
-    spoof the header and mint itself a fresh bucket per request.
+    The browser's own address is the first entry of X-Forwarded-For.
+
+    Known limitation, stated plainly because the deployment topology changed
+    under it: the backend is reachable directly on its own public hostname, not
+    only through the proxy. Bot traffic in the origin logs proves it. So a
+    caller who skips the frontend can spoof this header and mint a fresh bucket
+    per request.
+
+    That makes this limit a cost control against ordinary looping -- a refresh
+    key held down, a demo re-run, a retry storm -- and NOT a security boundary
+    against someone deliberately trying to burn the Groq quota. Closing that
+    gap needs the origin to stop accepting unproxied traffic (a shared secret
+    the rewrite injects, or network rules), after which this can go back to
+    being trustworthy. Counting a trusted-hop offset instead would not help
+    while the origin still answers anyone who asks.
     """
     forwarded = request.headers.get("x-forwarded-for", "")
     for hop in forwarded.split(","):

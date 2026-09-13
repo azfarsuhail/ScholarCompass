@@ -103,11 +103,14 @@ The subtle part: `next.config.ts` rewrites `/api/*` through the Next server, so
 `request.client.host` is **always the proxy**. Keying on it would have put every
 student on earth into one shared 5-per-minute bucket — the second visitor of any
 minute throttled because of the first. `client_key()` keys on the first
-`X-Forwarded-For` hop instead. That trust is sound only while the proxy is the
-sole ingress; if the container is ever exposed directly it must become a
-trusted-hop count.
+`X-Forwarded-For` hop instead. Refusals carry `Retry-After`, per PRD §8.1.
 
-Refusals carry `Retry-After`, per PRD §8.1.
+**Stated limitation:** the API is reachable on its own public hostname, not
+only through the proxy, so a caller who skips the frontend can spoof that
+header and mint a fresh bucket per request. This limit is therefore a cost
+control against ordinary looping, not a security boundary against someone
+deliberately burning the Groq quota. Closing it means making the origin refuse
+unproxied traffic — a shared secret injected by the rewrite, or network rules.
 
 ### Measured
 

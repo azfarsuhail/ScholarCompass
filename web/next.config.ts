@@ -2,7 +2,15 @@ import type { NextConfig } from "next";
 
 // Where the FastAPI container actually lives. In dev that is the local
 // uvicorn; on Vercel it is the deployed backend origin.
-const API_ORIGIN = process.env.API_ORIGIN ?? "http://localhost:8000";
+// Trailing slashes are stripped because the destination below appends its own.
+// A value pasted with one -- which is what a browser shows you when you copy a
+// deployed URL, and what most dashboard fields keep -- produces
+// `https://host//v1/documents`, and FastAPI 404s the double slash. That failure
+// is nasty precisely because it looks like success: the proxy connects, the
+// backend answers, and the only symptom is a 404 with the origin's own error
+// body. Normalising here means the deploy cannot be broken by how someone
+// typed a URL into a web form.
+const API_ORIGIN = (process.env.API_ORIGIN ?? "http://localhost:8000").replace(/\/+$/, "");
 
 const nextConfig: NextConfig = {
   /**

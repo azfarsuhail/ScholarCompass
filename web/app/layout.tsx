@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 
 import { GeometricBackground } from "@/components/ui/GeometricBackground";
+import { KeepAlive } from "@/components/KeepAlive";
 
 /**
  * Inter Variable, in two roles.
@@ -46,6 +47,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             never torn down and restarted. `fixed` anchors it to the viewport
             so it does not scroll away with the hero. */}
         <GeometricBackground />
+        {/* Render-nothing ping that keeps the free-tier API container warm.
+            Mounted here for the same reason as the background: the layout
+            outlives route changes, so the interval is never restarted. */}
+        <KeepAlive />
         {children}
       </body>
     </html>

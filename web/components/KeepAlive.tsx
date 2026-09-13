@@ -17,13 +17,32 @@ import { useEffect } from "react";
  * goes direct to the backend origin instead of through the /api/* rewrite --
  * it carries no session cookie and wants none.
  */
+// Read at module scope so the bundler inlines it. When the variable is absent
+// at BUILD time the inline does not happen, `process.env.X` survives into the
+// bundle, and in the browser it evaluates to undefined -- which template-literals
+// into the string "undefined/docs" and resolves against the page origin. The
+// result is a keep-alive that pings the FRONTEND's own 404 every ten minutes
+// while the backend cold-starts exactly as before: alive-looking, warming
+// nothing. Guarded below rather than left to fail silently.
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+const PING_INTERVAL_MS = 600_000; // 10 minutes
+
 export function KeepAlive() {
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/docs`, { method: "GET" }).catch(
-        () => {},
+    if (!API_URL) {
+      console.warn(
+        "KeepAlive: NEXT_PUBLIC_API_URL is unset, so no ping is sent and the " +
+          "API container will cold-start. Set it in the deployment environment " +
+          "and rebuild — it is inlined at build time, so adding it without a " +
+          "redeploy changes nothing.",
       );
-    }, 600000); // 10 minutes
+      return;
+    }
+
+    const interval = setInterval(() => {
+      fetch(`${API_URL}/docs`, { method: "GET" }).catch(() => {});
+    }, PING_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, []);

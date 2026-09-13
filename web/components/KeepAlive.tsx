@@ -23,7 +23,7 @@ export function KeepAlive() {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/docs`, { method: "GET" }).catch(
         () => {},
       );
-    }, 840000); // 14 minutes
+    }, 600000); // 10 minutes
 
     return () => clearInterval(interval);
   }, []);

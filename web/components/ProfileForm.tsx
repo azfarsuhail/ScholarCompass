@@ -504,11 +504,15 @@ export function ProfileForm() {
                       ))}
                     </AnimatePresence>
                   </motion.ul>
-                  <div className="mt-2 flex gap-2">
+                  <div className="mt-2 flex items-center gap-2">
                     <Input
                       id="skill-input"
                       ref={skillInputRef}
-                      className={CONTROL}
+                      // min-w-0 alongside flex-1: a flex item's default
+                      // min-width:auto floors it at its intrinsic content
+                      // width, so a long placeholder would set the row's
+                      // minimum and push the button out.
+                      className={`${CONTROL} min-w-0 flex-1`}
                       placeholder="Add a skill"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -518,7 +522,20 @@ export function ProfileForm() {
                         }
                       }}
                     />
-                    <Button type="button" variant="outline" className={CONTROL} onClick={addSkill}>
+                    {/*
+                      fr-btn-secondary, not CONTROL: .fr-input carries
+                      width:100%, and Button ships shrink-0 in its base
+                      variant. Together those made this claim the whole row
+                      and refuse to give any of it back, collapsing the input
+                      beside it. Both classes floor at 44px, so the row still
+                      lines up.
+                    */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="fr-btn-secondary w-auto shrink-0"
+                      onClick={addSkill}
+                    >
                       Add
                     </Button>
                   </div>
